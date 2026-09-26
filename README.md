@@ -12,6 +12,27 @@ correção num formato que o próprio agente aplica.
 
 Em construção. Nada publicado ainda no npm.
 
+## Ferramentas
+
+Varredura de site é demorada, então o ciclo tem três passos em vez de uma chamada que expira.
+
+| Ferramenta | O que faz |
+|---|---|
+| `guard_scan_site` | Inicia a varredura e devolve um `scan_id`. Abre um navegador de verdade, aceita e rejeita o banner, e observa o que o site faz em cada caso |
+| `guard_get_scan_status` | Diz se já terminou. Leva cerca de dois minutos |
+| `guard_get_scan_results` | Devolve os achados do mais grave para o menos grave, com a nota geral |
+
+O resultado traz só o que precisa de atenção. Passe `include_passed` para ver também o que está
+correto.
+
+## Configuração
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura |
+| `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
+| `GUARD_REQUEST_TIMEOUT_MS` | `15000` | Tempo limite de cada chamada, não da varredura |
+
 ## Princípios
 
 - **Seu código não sai da sua máquina.** A análise de código roda local; para o Guard vão apenas os

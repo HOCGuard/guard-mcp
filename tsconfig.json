@@ -6,6 +6,8 @@
     "lib": ["ES2023"],
     "outDir": "dist",
     "rootDir": "src",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
