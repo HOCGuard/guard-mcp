@@ -1,0 +1,50 @@
+{
+  "name": "@hocguard/mcp",
+  "version": "0.0.1",
+  "description": "Servidor MCP do HOC Guard: varredura de segurança e privacidade para apps, e verificação de skills e servidores MCP",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "guard-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HOCGuard/guard-mcp.git"
+  },
+  "homepage": "https://guard.hoc.app.br",
+  "bugs": {
+    "url": "https://github.com/HOCGuard/guard-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "security",
+    "privacy",
+    "lgpd",
+    "sast",
+    "skill-verification"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit",
+    "test": "node --test \"tests/*.test.ts\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.1.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.1.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  }
+}
