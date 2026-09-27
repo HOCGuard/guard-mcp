@@ -47,7 +47,7 @@ para o próprio agente aplicar.
 <summary><strong>Claude Code</strong></summary>
 
 ```bash
-claude mcp add hoc-guard -- npx -y github:HOCGuard/guard-mcp#claude/awesome-franklin-0jy5of
+claude mcp add hoc-guard -- npx -y github:HOCGuard/guard-mcp
 ```
 
 </details>
@@ -60,7 +60,7 @@ Em `~/.codex/config.toml`:
 ```toml
 [mcp_servers.hoc-guard]
 command = "npx"
-args = ["-y", "github:HOCGuard/guard-mcp#claude/awesome-franklin-0jy5of"]
+args = ["-y", "github:HOCGuard/guard-mcp"]
 ```
 
 </details>
@@ -75,7 +75,7 @@ No arquivo de configuração de MCP do cliente:
   "mcpServers": {
     "hoc-guard": {
       "command": "npx",
-      "args": ["-y", "github:HOCGuard/guard-mcp#claude/awesome-franklin-0jy5of"]
+      "args": ["-y", "github:HOCGuard/guard-mcp"]
     }
   }
 }
