@@ -48,6 +48,7 @@ test('gera integração a partir de conteúdo inline', async () => {
     name: 'guard_generate_cookie_banner',
     arguments: { files: [{ path: 'app/layout.tsx', content: LAYOUT }], banner_id: 'bn_1' },
   }));
+  assert.equal(out['mode'], 'consent-gate');
   assert.equal(out['router'], 'app');
   assert.deepEqual(out['purposes'], ['necessary', 'analytics', 'marketing']);
   const layout = out['changes'].find((f: any) => f.path === 'app/layout.tsx' && f.code.includes('banner.js'));
@@ -57,7 +58,7 @@ test('gera integração a partir de conteúdo inline', async () => {
   assert.deepEqual(out['warnings'], []);
 });
 
-test('lê o projeto do disco ignorando node_modules e avisa sem banner_id', async () => {
+test('lê o projeto do disco ignorando node_modules; sem tracker gera aviso informativo', async () => {
   const root = await mkdtemp(join(tmpdir(), 'guard-'));
   await mkdir(join(root, 'app'));
   await mkdir(join(root, 'node_modules', 'x'), { recursive: true });
@@ -66,7 +67,12 @@ test('lê o projeto do disco ignorando node_modules e avisa sem banner_id', asyn
   const c = await client();
   const out = payload(await c.callTool({ name: 'guard_generate_cookie_banner', arguments: { project_path: root } }));
   assert.deepEqual(out['trackers'], []);
-  assert.ok(out['warnings'].some((w: string) => w.includes('SEU_BANNER_ID')));
+  assert.equal(out['mode'], 'notice');
+  const aviso = out['changes'].find((f: any) => f.path === 'components/CookieNotice.tsx');
+  assert.ok(aviso, 'deve gerar o componente de aviso');
+  assert.match(aviso.code, /Política de Privacidade/);
+  // não é parede de consentimento, então não pede banner_id.
+  assert.ok(!out['warnings'].some((w: string) => w.includes('SEU_BANNER_ID')));
 });
 
 test('exige project_path ou files', async () => {
