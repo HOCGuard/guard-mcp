@@ -125,6 +125,8 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 
 | Ferramenta | O que faz |
 |---|---|
+| `guard_login` | Conecta você ao Guard sem colar token, no estilo `npm login`/`gh auth login`: devolve um link e um código curto, você autoriza no navegador e o Guard passa a agir em nome da sua conta. Rode uma vez por máquina |
+| `guard_logout` | Encerra o login local (apaga a credencial em `~/.hocguard`) |
 | `guard_generate_cookie_banner` | Lê o projeto Next localmente, detecta os rastreadores e devolve a conformidade de cookies: banner de consentimento (se há analytics/marketing) ou aviso informativo (se só há cookies essenciais) |
 | `guard_add_consent_point` | Acha formulários que coletam dado pessoal sem consentimento e devolve o ponto de coleta (checkbox com base legal e link de política) |
 | `guard_check_compliance` | Diagnóstico local: tracker sem consentimento, formulário sem consentimento, transferência internacional e falta de link de política, com nota 0-100 e relatório em Markdown |
@@ -132,7 +134,7 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 | `guard_generate_policy` | Rascunho de política de privacidade que descreve os rastreadores, campos e terceiros que o app realmente usa |
 | `guard_explain` | Explica um achado em português: o que é, por que importa, o que a LGPD diz e como corrigir |
 | `guard_create_banner` | Cria o banner do site sem precisar de conta e devolve o `banner_id`. O comprovante de posse fica só na sua máquina |
-| `guard_scan_site` | Inicia a varredura de um site publicado. Abre um navegador de verdade, aceita e rejeita o banner e observa o que dispara em cada caso |
+| `guard_scan_site` | Inicia a varredura de um site publicado. Faça `guard_login` antes: a varredura usa o seu login pra provar a posse do domínio (precisa estar entre os domínios verificados da sua conta). Abre um navegador de verdade, aceita e rejeita o banner e observa o que dispara em cada caso |
 | `guard_get_scan_status` | Diz se a varredura terminou. Leva cerca de dois minutos |
 | `guard_get_scan_results` | Devolve os achados do mais grave para o menos grave, com a nota geral |
 
@@ -145,7 +147,9 @@ traz só o que precisa de atenção; passe `include_passed` para ver também o q
 |---|---|---|
 | `GUARD_SDK_URL` | `https://guard.hoc.app.br/sdk/banner.js` | De onde o site carrega o banner |
 | `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura |
-| `GUARD_SERVICE_TOKEN` | (nenhum) | Token exigido pelo serviço de varredura, quando ele estiver protegido |
+| `GUARD_AUTH_URL` | `https://auth.grupohoc.com.br` | Issuer do login (`guard_login`, Device Flow) |
+| `GUARD_SERVICE_TOKEN` | (nenhum) | Token de serviço pra uso interno. No dia a dia, prefira `guard_login` |
+| `GUARD_CREDENTIALS_PATH` | `<GUARD_HOME>/.hocguard/credentials.json` | Onde a credencial do login é guardada (útil em testes) |
 | `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
 | `GUARD_REQUEST_TIMEOUT_MS` | `15000` | Tempo limite de cada chamada, não da varredura |
 | `GUARD_TELEMETRY` | desligada | `1` liga a telemetria de uso anônima (ver abaixo) |
