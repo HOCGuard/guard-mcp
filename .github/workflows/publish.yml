@@ -1,8 +1,10 @@
 name: Publicar no npm
 
-# Publica @hocguard/mcp quando uma release é publicada no GitHub.
-# Usa trusted publishing (OIDC): nenhum token de npm fica guardado no repositório.
+# Publica @hocguard/mcp ao empurrar uma tag vX.Y.Z, ou ao publicar uma release
+# no GitHub. Usa trusted publishing (OIDC): nenhum token de npm no repositório.
 on:
+  push:
+    tags: ['v*']
   release:
     types: [published]
 
