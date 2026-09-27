@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { collect } from '../generate/collect.ts';
-import { checkCompliance } from '../generate/compliance.ts';
+import { checkCompliance, scoreOf } from '../generate/compliance.ts';
 import { buildPolicy } from '../generate/policy.ts';
 import { buildReport } from '../generate/report.ts';
 import { explain, EXPLANATIONS } from '../generate/explain.ts';
@@ -92,23 +92,22 @@ export function registerAdvancedTools(server: McpServer, sdkUrl: string): void {
         const consent = buildConsentPoints(forms);
         const policy = buildPolicy(src, { dpoEmail: dpo_email });
 
-        const checklist = [
-          { passo: 'Cookies', modo: banner.mode, arquivos: banner.files.length, feito: false },
-          { passo: 'Consentimento em formulários', formularios_sem_consentimento: forms.filter((f) => !f.hasConsent).length, arquivos: consent.files.length, feito: false },
-          { passo: 'Política de privacidade', gerada: true, feito: false },
-        ];
-        // Estimativa: aplicar as mudanças zera os achados que elas resolvem.
-        const depois = 100;
+        // Aplicar os diffs resolve o que é código: banner (tracker) e
+        // consentimento (formulário). Política e transferência exigem passo
+        // humano (publicar, contrato), então continuam pendentes na estimativa.
+        const RESOLVIDO_PELO_CODIGO = new Set(['tracker-sem-consentimento', 'form-sem-consentimento']);
+        const pendentes = antes.findings.filter((f) => !RESOLVIDO_PELO_CODIGO.has(f.code));
+        const score_depois_estimado = scoreOf(pendentes);
 
         return text({
           score_antes: antes.score,
-          score_depois_estimado: depois,
-          checklist,
+          score_depois_estimado,
+          resolvido_ao_aplicar: antes.findings.filter((f) => RESOLVIDO_PELO_CODIGO.has(f.code)).map((f) => f.code),
+          ainda_pendente: pendentes.map((f) => ({ code: f.code, acao: f.code === 'sem-link-politica' ? 'publicar a política e linkar no rodapé' : f.code === 'transferencia-internacional' ? 'declarar terceiros e garantir cláusulas contratuais' : 'ação humana' })),
           banner: { mode: banner.mode, changes: banner.files, warnings: banner.warnings },
           consent_points: { changes: consent.files, warnings: consent.warnings },
           policy: { policy_markdown: policy.markdown, warnings: policy.warnings },
           report_markdown: buildReport(antes.score, antes.findings),
-          proximo_passo: 'Aplique as mudanças de banner e consent_points, publique a política, e rode guard_check_compliance de novo para confirmar.',
         });
       } catch (error) { return fail(error); }
     },

@@ -67,8 +67,11 @@ export function checkCompliance(files: SourceFile[]): { findings: Finding[]; sco
     });
   }
 
-  // Nota simples: 100 menos peso por achado. Alta -35, média -15, baixa -5.
+  return { findings, score: scoreOf(findings) };
+}
+
+// Nota simples: 100 menos peso por achado. Alta -35, média -15, baixa -5.
+export function scoreOf(findings: Finding[]): number {
   const peso = { alta: 35, media: 15, baixa: 5 } as const;
-  const score = Math.max(0, 100 - findings.reduce((s, f) => s + peso[f.severity], 0));
-  return { findings, score };
+  return Math.max(0, 100 - findings.reduce((s, f) => s + peso[f.severity], 0));
 }
