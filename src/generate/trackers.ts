@@ -20,7 +20,7 @@ export const TRACKER_RULES: TrackerRule[] = [
     provider: 'Google Analytics',
     purpose: 'analytics',
     consentMode: true,
-    patterns: [/googletagmanager\.com\/gtag\/js/, /\bgtag\(\s*['"]config['"]/, /<GoogleAnalytics\b/, /react-ga4?/],
+    patterns: [/googletagmanager\.com\/gtag\/js/, /\bgtag\(\s*['"]config['"]/, /<GoogleAnalytics\b/, /@next\/third-parties\/google/, /react-ga4?/],
   },
   {
     id: 'google-tag-manager',

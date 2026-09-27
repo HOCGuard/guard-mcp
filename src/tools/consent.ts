@@ -4,6 +4,7 @@ import { collect } from '../generate/collect.ts';
 import { detectForms } from '../generate/forms.ts';
 import { buildConsentPoints } from '../generate/consent-point.ts';
 import { checkCompliance } from '../generate/compliance.ts';
+import { buildReport } from '../generate/report.ts';
 import type { SourceFile } from '../generate/trackers.ts';
 
 const inputSchema = z.object({
@@ -72,7 +73,7 @@ export function registerConsentTools(server: McpServer): void {
       if (!project_path && !files?.length) return needInput();
       try {
         const { findings, score } = checkCompliance(await sources(project_path, files));
-        return text({ score, total: findings.length, findings });
+        return text({ score, total: findings.length, findings, report_markdown: buildReport(score, findings) });
       } catch (error) {
         return { content: [{ type: 'text' as const, text: `Não consegui ler o projeto: ${String(error)}` }], isError: true as const };
       }

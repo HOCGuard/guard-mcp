@@ -4,6 +4,7 @@ import { loadConfig, type Config } from './config.ts';
 import { registerScanTools } from './tools/scan.ts';
 import { registerGenerateTools } from './tools/generate.ts';
 import { registerConsentTools } from './tools/consent.ts';
+import { registerAdvancedTools } from './tools/advanced.ts';
 
 export const SERVER_NAME = 'hoc-guard';
 export const SERVER_VERSION = '0.0.1';
@@ -13,5 +14,6 @@ export function createServer(config: Config = loadConfig()): McpServer {
   registerScanTools(server, new AuditorClient(config));
   registerGenerateTools(server, config.sdkUrl);
   registerConsentTools(server);
+  registerAdvancedTools(server, config.sdkUrl);
   return server;
 }

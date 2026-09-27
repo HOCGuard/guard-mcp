@@ -1,5 +1,6 @@
 import { detectTrackers, type SourceFile } from './trackers.ts';
 import { detectForms } from './forms.ts';
+import { detectTransfers } from './transfers.ts';
 
 // Diagnóstico local de conformidade LGPD. Estático, roda sem backend: lê o
 // código e aponta o que está fora, sem varrer o site no ar.
@@ -40,6 +41,17 @@ export function checkCompliance(files: SourceFile[]): { findings: Finding[]; sco
       title: 'Formulário coleta dado pessoal sem consentimento',
       detail: `${formsSemConsentimento.length} formulário(s) coletam dado pessoal (${[...new Set(formsSemConsentimento.flatMap((f) => f.fields))].join(', ')}) sem ponto de coleta de consentimento. Rode guard_add_consent_point.`,
       files: formsSemConsentimento.map((f) => f.path),
+    });
+  }
+
+  const transfers = detectTransfers(files);
+  if (transfers.length > 0) {
+    findings.push({
+      severity: 'media',
+      code: 'transferencia-internacional',
+      title: 'Dado pessoal pode ser transferido para fora do Brasil',
+      detail: `Serviços estrangeiros no código: ${transfers.map((t) => `${t.service} (${t.country})`).join('; ')}. A LGPD (art. 33) exige base legal e transparência para transferência internacional. Informe esses terceiros na política de privacidade.`,
+      files: [...new Set(transfers.flatMap((t) => t.files))],
     });
   }
 
