@@ -8,6 +8,7 @@ import { registerConsentTools } from './tools/consent.ts';
 import { registerAdvancedTools } from './tools/advanced.ts';
 import { instrumentTools, telemetryHome } from './telemetry.ts';
 import { registerPrompts } from './tools/prompts.ts';
+import { registerBannerTools } from './tools/banner.ts';
 
 export const SERVER_NAME = 'hoc-guard';
 // src/ e dist/ ficam um nível abaixo da raiz do pacote.
@@ -19,12 +20,13 @@ export function createServer(config: Config = loadConfig()): McpServer {
     enabled: config.telemetry === true,
     url: config.telemetryUrl ?? `${new URL(config.sdkUrl).origin}/api/v1/public/mcp/telemetry`,
     version: SERVER_VERSION,
-    homeDir: telemetryHome(),
+    homeDir: config.homeDir ?? telemetryHome(),
   });
   registerScanTools(server, new AuditorClient(config));
   registerGenerateTools(server, config.sdkUrl);
   registerConsentTools(server);
   registerAdvancedTools(server, config.sdkUrl);
+  registerBannerTools(server, { apiOrigin: new URL(config.sdkUrl).origin, homeDir: config.homeDir ?? telemetryHome(), version: SERVER_VERSION });
   registerPrompts(server);
   return server;
 }

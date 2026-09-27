@@ -8,6 +8,8 @@ export interface Config {
   /** Telemetria opt-in (GUARD_TELEMETRY=1). Desligada por padrão. */
   telemetry?: boolean;
   telemetryUrl?: string | undefined;
+  /** Onde fica ~/.hocguard. Padrão: GUARD_HOME ou a home do usuário. */
+  homeDir?: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {

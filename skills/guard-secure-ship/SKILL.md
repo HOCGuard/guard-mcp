@@ -5,13 +5,13 @@ description: "Deixa o projeto pronto para a LGPD de ponta a ponta: diagnostica, 
 
 # guard-secure-ship
 
-<!-- Gerado de src/workflow.ts. Não edite à mão: o teste de consistência falha se divergir. -->
+<!-- Gerado de src/workflow.ts por `npm run gen:skill`. Não edite à mão. -->
 
 Você vai deixar este projeto em conformidade com a LGPD usando as ferramentas do HOC Guard. Siga os passos na ordem e não pule a confirmação com o usuário.
 
 1. Diagnóstico. Chame guard_check_compliance com project_path apontando para a raiz do projeto. Mostre ao usuário a nota e os achados em linguagem simples. Se ele perguntar o porquê de algum, chame guard_explain com o código do achado.
 
-2. Plano. Chame guard_make_compliant com o mesmo project_path (e banner_id, se o usuário tiver um). Apresente o plano: o que será alterado em cada arquivo, a nota antes e a estimativa depois, e o que continua pendente e depende de ação humana. Peça confirmação antes de editar qualquer arquivo.
+2. Plano. Se o projeto tem rastreadores e o usuário não tem banner_id, pergunte a URL do site e chame guard_create_banner. Depois chame guard_make_compliant com o mesmo project_path e o banner_id. Apresente o plano: o que será alterado em cada arquivo, a nota antes e a estimativa depois, e o que continua pendente e depende de ação humana. Peça confirmação antes de editar qualquer arquivo.
 
 3. Aplicação. Com a confirmação, aplique as mudanças de banner.changes e consent_points.changes. Arquivos com action "create" são novos; com action "edit", insira o trecho no ponto indicado pela nota, sem apagar o que já existe. Se banner.mode for "already-installed", não mexa no banner.
 

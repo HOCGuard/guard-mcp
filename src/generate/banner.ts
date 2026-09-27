@@ -183,7 +183,7 @@ export function buildBannerIntegration(plan: BannerPlan): { mode: IntegrationMod
   const purposes = ['necessary', ...new Set(plan.trackers.map((t) => t.purpose))];
   if (!plan.bannerId) {
     warnings.push(
-      `Sem banner_id: troque ${PLACEHOLDER_ID} pelo id do banner criado no painel do HOC Guard. A criação anônima pelo MCP (Hguard-1424) ainda não está no ar.`,
+      `Sem banner_id: chame guard_create_banner com a URL do site para criar um sem conta, ou troque ${PLACEHOLDER_ID} pelo id de um banner do painel do HOC Guard.`,
     );
   }
   if (naoNext) {

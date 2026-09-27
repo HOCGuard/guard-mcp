@@ -40,7 +40,8 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "node --test \"tests/*.test.ts\""
+    "test": "node --test \"tests/*.test.ts\"",
+    "gen:skill": "node scripts/gen-skill.ts"
   },
   "dependencies": {
     "@babel/parser": "^7.29.9",
