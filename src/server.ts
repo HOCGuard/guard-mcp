@@ -7,6 +7,7 @@ import { registerGenerateTools } from './tools/generate.ts';
 import { registerConsentTools } from './tools/consent.ts';
 import { registerAdvancedTools } from './tools/advanced.ts';
 import { instrumentTools, telemetryHome } from './telemetry.ts';
+import { registerPrompts } from './tools/prompts.ts';
 
 export const SERVER_NAME = 'hoc-guard';
 // src/ e dist/ ficam um nível abaixo da raiz do pacote.
@@ -24,5 +25,6 @@ export function createServer(config: Config = loadConfig()): McpServer {
   registerGenerateTools(server, config.sdkUrl);
   registerConsentTools(server);
   registerAdvancedTools(server, config.sdkUrl);
+  registerPrompts(server);
   return server;
 }
