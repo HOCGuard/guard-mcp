@@ -1,4 +1,5 @@
 import type { SourceFile } from './trackers.ts';
+import { analyzeFormAst, codeOf } from './ast.ts';
 
 // Detecção de formulários que coletam dado pessoal. Heurística estática: acha
 // <form> ou campos de entrada de dado pessoal (e-mail, telefone, CPF, nome) e
@@ -30,7 +31,14 @@ const CONSENT_SIGNAL = /type=["']checkbox["'][^>]*(consent|aceit|termos|privac|l
 export function detectForms(files: SourceFile[]): DetectedForm[] {
   const forms: DetectedForm[] = [];
   for (const file of files) {
-    const c = file.content;
+    // JS/TS: lê os elementos JSX (preciso). Outros formatos: regex sem comentários.
+    const ast = analyzeFormAst(file.path, file.content);
+    if (ast) {
+      if (!ast.hasForm || ast.fields.length === 0) continue;
+      forms.push({ path: file.path, fields: ast.fields, hasConsent: ast.hasConsent });
+      continue;
+    }
+    const c = codeOf(file);
     if (!FORM_SIGNAL.test(c)) continue;
     const fields = PERSONAL_FIELDS.filter((f) => f.pattern.test(c)).map((f) => f.field);
     if (fields.length === 0) continue;

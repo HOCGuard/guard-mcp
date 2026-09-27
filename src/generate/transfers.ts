@@ -1,4 +1,5 @@
 import type { SourceFile } from './trackers.ts';
+import { codeOf } from './ast.ts';
 
 // Detecção de transferência internacional de dados (LGPD Cap. V, art. 33). Lê o
 // código e sinaliza serviços que recebem dado pessoal fora do Brasil. Estático,
@@ -39,7 +40,8 @@ export function detectTransfers(files: SourceFile[]): DetectedTransfer[] {
   const found = new Map<string, DetectedTransfer>();
   for (const file of files) {
     for (const rule of TRANSFER_RULES) {
-      if (!rule.patterns.some((p) => p.test(file.content))) continue;
+      const code = codeOf(file);
+      if (!rule.patterns.some((p) => p.test(code))) continue;
       const entry = found.get(rule.id) ?? { id: rule.id, service: rule.service, country: rule.country, files: [] };
       if (!entry.files.includes(file.path)) entry.files.push(file.path);
       found.set(rule.id, entry);

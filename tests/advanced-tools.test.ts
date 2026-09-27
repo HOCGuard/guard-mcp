@@ -11,7 +11,8 @@ export function Contato() {
     <button>Enviar</button>
   </form>);
 }
-// usa fonts.googleapis.com e api.stripe.com`;
+const fontes = 'https://fonts.googleapis.com/css2?family=Inter';
+const pagamento = fetch('https://api.stripe.com/v1/checkout');`;
 
 async function client() {
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -104,4 +105,32 @@ test('política traz cabeçalho de rascunho', async () => {
   const c = await client();
   const out = payload(await c.callTool({ name: 'guard_generate_policy', arguments: { files: [{ path: 'app/p.tsx', content: '<input type="email" />' }] } }));
   assert.match(out['policy_markdown'], /RASCUNHO/);
+});
+
+test('AST: rastreador citado só em comentário não vira achado', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_check_compliance', arguments: { files: [
+    { path: 'app/page.tsx', content: "// TODO: talvez usar googletagmanager.com/gtag/js no futuro\n/* fbq('init') */\nexport default function P(){ return null; }" },
+  ] } }));
+  assert.deepEqual(out['findings'], []);
+});
+
+test('AST: "email" em variável não é formulário; input type=email dentro de form é', async () => {
+  const c = await client();
+  const semForm = payload(await c.callTool({ name: 'guard_add_consent_point', arguments: { files: [
+    { path: 'lib/mail.ts', content: "export function enviar(email: string) { return email.trim(); }" },
+  ] } }));
+  assert.deepEqual(semForm['forms'], []);
+  const comForm = payload(await c.callTool({ name: 'guard_add_consent_point', arguments: { files: [
+    { path: 'app/c.tsx', content: 'export const C = () => <form onSubmit={x}><input type="email" name="contato" /></form>;' },
+  ] } }));
+  assert.deepEqual(comForm['forms'][0].fields, ['email']);
+});
+
+test('AST: URL com // não é tratada como comentário', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_check_compliance', arguments: { files: [
+    { path: 'app/layout.tsx', content: 'export const s = <script src="https://connect.facebook.net/en_US/fbevents.js" />;' },
+  ] } }));
+  assert.ok(out['findings'].some((f: any) => f.code === 'tracker-sem-consentimento'));
 });

@@ -1,0 +1,1 @@
+{ "name": "saas", "dependencies": { "next": "15.0.0", "react": "19.0.0", "react-hook-form": "^7", "@stripe/stripe-js": "^4", "@next/third-parties": "15.0.0" } }
