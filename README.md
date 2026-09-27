@@ -12,6 +12,7 @@
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-Apache--2.0-f26522?style=flat-square" alt="Licença Apache-2.0"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/protocolo-MCP-1a1a1a?style=flat-square" alt="Model Context Protocol"></a>
+  <a href="https://www.npmjs.com/package/@hocguard/mcp"><img src="https://img.shields.io/npm/v/@hocguard/mcp?style=flat-square&color=f26522&label=npm" alt="Versão no npm"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-1a1a1a?style=flat-square" alt="Node 20 ou superior">
   <img src="https://img.shields.io/badge/feito%20para-LGPD-f26522?style=flat-square" alt="Feito para a LGPD">
   <img src="https://img.shields.io/badge/status-preview-lightgrey?style=flat-square" alt="Em preview">
@@ -41,13 +42,13 @@ para o próprio agente aplicar.
 ## Instalar
 
 > [!NOTE]
-> Preview: ainda não publicado no npm. A instalação é direto do GitHub.
+> Requer Node 20 ou superior. Nada para instalar antes: o `npx` baixa o pacote na primeira execução.
 
 <details open>
 <summary><strong>Claude Code</strong></summary>
 
 ```bash
-claude mcp add hoc-guard -- npx -y github:HOCGuard/guard-mcp
+claude mcp add hoc-guard -- npx -y @hocguard/mcp
 ```
 
 </details>
@@ -60,7 +61,7 @@ Em `~/.codex/config.toml`:
 ```toml
 [mcp_servers.hoc-guard]
 command = "npx"
-args = ["-y", "github:HOCGuard/guard-mcp"]
+args = ["-y", "@hocguard/mcp"]
 ```
 
 </details>
@@ -75,7 +76,7 @@ No arquivo de configuração de MCP do cliente:
   "mcpServers": {
     "hoc-guard": {
       "command": "npx",
-      "args": ["-y", "github:HOCGuard/guard-mcp"]
+      "args": ["-y", "@hocguard/mcp"]
     }
   }
 }

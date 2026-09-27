@@ -1,0 +1,30 @@
+name: Publicar no npm
+
+# Publica @hocguard/mcp quando uma release é publicada no GitHub.
+# Usa trusted publishing (OIDC): nenhum token de npm fica guardado no repositório.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test
+      - name: Confere se a tag bate com a versão do package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          versao="$(node -p "require('./package.json').version")"
+          test "$tag" = "$versao" || { echo "Tag $GITHUB_REF_NAME diferente da versão $versao"; exit 1; }
+      - run: npm publish
