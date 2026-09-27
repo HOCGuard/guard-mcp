@@ -58,7 +58,7 @@ after(() => http.close());
 async function client(apiUrl = baseUrl) {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const c = new Client({ name: 'test', version: '0.0.0' });
-  const server = createServer({ apiUrl, tenant: 'public', requestTimeoutMs: 5000 });
+  const server = createServer({ apiUrl, tenant: 'public', requestTimeoutMs: 5000, sdkUrl: 'https://guard.test/sdk/banner.js' });
   await Promise.all([server.connect(b), c.connect(a)]);
   return c;
 }
@@ -68,10 +68,10 @@ function payload(result: unknown) {
   return JSON.parse(first!.text) as Record<string, unknown>;
 }
 
-test('expõe exatamente as três ferramentas de varredura', async () => {
+test('expõe exatamente as ferramentas de varredura e de geração', async () => {
   const c = await client();
   const { tools } = await c.listTools();
-  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_get_scan_results', 'guard_get_scan_status', 'guard_scan_site']);
+  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_generate_cookie_banner', 'guard_get_scan_results', 'guard_get_scan_status', 'guard_scan_site']);
   await c.close();
 });
 
