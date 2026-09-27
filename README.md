@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/assets/header.webp" alt="HOC Guard MCP conectado a Claude Code, Cursor, Codex, Windsurf, Antigravity, Lovable e Replit" width="100%">
+</p>
+
 # HOC Guard MCP
 
 Servidor [MCP](https://modelcontextprotocol.io) do HOC Guard. Dá ao seu agente de código as
@@ -21,7 +25,15 @@ acesso ao repositório.
 claude mcp add hoc-guard -- npx -y github:HOCGuard/guard-mcp#claude/awesome-franklin-0jy5of
 ```
 
-**Cursor, Windsurf, Grok e outros clientes MCP** (arquivo de configuração de MCP do cliente):
+**Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.hoc-guard]
+command = "npx"
+args = ["-y", "github:HOCGuard/guard-mcp#claude/awesome-franklin-0jy5of"]
+```
+
+**Cursor, Windsurf, Antigravity, Grok e outros clientes MCP** (arquivo de configuração de MCP do cliente):
 
 ```json
 {
