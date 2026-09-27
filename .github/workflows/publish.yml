@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      # stage publish exige npm 11.5.1+ e é o caminho que dispensa marcar
+      # "Allow npm publish" no Trusted Publisher.
+      - run: npm install -g npm@latest
       - run: npm ci
       - run: npm run type-check
       - run: npm test
@@ -27,4 +30,4 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           versao="$(node -p "require('./package.json').version")"
           test "$tag" = "$versao" || { echo "Tag $GITHUB_REF_NAME diferente da versão $versao"; exit 1; }
-      - run: npm publish
+      - run: npm stage publish
