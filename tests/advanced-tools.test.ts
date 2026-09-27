@@ -53,8 +53,11 @@ test('guard_make_compliant devolve checklist, banner, consentimento e política'
   const c = await client();
   const out = payload(await c.callTool({ name: 'guard_make_compliant', arguments: { files: [{ path: 'app/layout.tsx', content: APP }], banner_id: 'bn_1' } }));
   assert.ok(out['score_antes'] < 100);
-  assert.equal(out['score_depois_estimado'], 100);
-  assert.ok(Array.isArray(out['checklist']) && out['checklist'].length === 3);
+  // depois honesto: banner e consentimento resolvidos, política e transferência pendentes.
+  assert.ok(out['score_depois_estimado'] > out['score_antes']);
+  assert.ok(out['score_depois_estimado'] < 100);
+  assert.ok(out['resolvido_ao_aplicar'].includes('tracker-sem-consentimento'));
+  assert.ok(out['ainda_pendente'].some((p: any) => p.code === 'transferencia-internacional'));
   assert.equal(out['banner']['mode'], 'consent-gate');
   assert.ok(out['consent_points']['changes'].some((f: any) => f.path === 'components/ConsentField.tsx'));
   assert.match(out['policy']['policy_markdown'], /Política de Privacidade/);
