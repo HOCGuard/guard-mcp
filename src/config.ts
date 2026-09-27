@@ -3,6 +3,8 @@ export interface Config {
   tenant: string;
   requestTimeoutMs: number;
   sdkUrl: string;
+  /** Hguard-1434: o consent-auditor exige X-Service-Token em toda rota. */
+  serviceToken: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -11,5 +13,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tenant: env['GUARD_TENANT'] ?? 'public',
     requestTimeoutMs: Number(env['GUARD_REQUEST_TIMEOUT_MS'] ?? 15_000),
     sdkUrl: env['GUARD_SDK_URL'] ?? 'https://guard.hoc.app.br/sdk/banner.js',
+    serviceToken: env['GUARD_SERVICE_TOKEN'],
   };
 }

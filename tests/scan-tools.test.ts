@@ -11,11 +11,13 @@ import { createServer } from '../src/server.ts';
 let http: Server;
 let baseUrl: string;
 let pollsAntesDeTerminar = 2;
+let ultimoServiceToken: string | null | undefined;
 
 before(async () => {
   http = createHttpServer((req, res) => {
     const url = req.url ?? '';
     res.setHeader('content-type', 'application/json');
+    ultimoServiceToken = req.headers['x-service-token'] as string | undefined;
 
     if (req.method === 'POST' && url === '/audit') {
       res.writeHead(202);
@@ -55,10 +57,10 @@ before(async () => {
 
 after(() => http.close());
 
-async function client(apiUrl = baseUrl) {
+async function client(apiUrl = baseUrl, serviceToken: string | undefined = undefined) {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const c = new Client({ name: 'test', version: '0.0.0' });
-  const server = createServer({ apiUrl, tenant: 'public', requestTimeoutMs: 5000, sdkUrl: 'https://guard.test/sdk/banner.js' });
+  const server = createServer({ apiUrl, tenant: 'public', requestTimeoutMs: 5000, sdkUrl: 'https://guard.test/sdk/banner.js', serviceToken });
   await Promise.all([server.connect(b), c.connect(a)]);
   return c;
 }
@@ -84,6 +86,16 @@ test('toda ferramenta declara as anotações que o cliente usa para decidir apro
     assert.equal(typeof tool.annotations?.openWorldHint, 'boolean', `${tool.name} sem openWorldHint`);
   }
   await c.close();
+});
+
+test('Hguard-1434: manda X-Service-Token quando configurado, e nada quando não', async () => {
+  const comToken = await client(baseUrl, 'segredo-123');
+  await comToken.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } });
+  assert.equal(ultimoServiceToken, 'segredo-123');
+
+  const semToken = await client(baseUrl, undefined);
+  await semToken.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } });
+  assert.equal(ultimoServiceToken, undefined);
 });
 
 test('o ciclo completo devolve achado ordenado e compacto', async () => {
