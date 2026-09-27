@@ -1,6 +1,7 @@
 import { detectTrackers, TRACKER_RULES, type SourceFile } from './trackers.ts';
 import { detectForms } from './forms.ts';
 import { detectTransfers, TRANSFER_RULES } from './transfers.ts';
+import { codeOf } from './ast.ts';
 
 // Diagnóstico local de conformidade LGPD. Estático, roda sem backend: lê o
 // código e aponta o que está fora, sem varrer o site no ar.
@@ -29,7 +30,7 @@ function evidenceLine(files: SourceFile[], paths: string[], patterns: RegExp[]):
   for (const p of paths) {
     const file = files.find((f) => f.path === p);
     if (!file) continue;
-    const linhas = file.content.split('\n');
+    const linhas = codeOf(file).split('\n');
     for (let i = 0; i < linhas.length; i++) {
       if (patterns.some((re) => re.test(linhas[i]!))) {
         return `${p}:${i + 1}: ${linhas[i]!.trim().slice(0, 120)}`;

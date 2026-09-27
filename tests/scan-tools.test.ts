@@ -73,15 +73,17 @@ function payload(result: unknown) {
 test('expõe exatamente as ferramentas de varredura e de geração', async () => {
   const c = await client();
   const { tools } = await c.listTools();
-  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_add_consent_point', 'guard_check_compliance', 'guard_explain', 'guard_generate_cookie_banner', 'guard_generate_policy', 'guard_get_scan_results', 'guard_get_scan_status', 'guard_make_compliant', 'guard_scan_site']);
+  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_add_consent_point', 'guard_check_compliance', 'guard_create_banner', 'guard_explain', 'guard_generate_cookie_banner', 'guard_generate_policy', 'guard_get_scan_results', 'guard_get_scan_status', 'guard_make_compliant', 'guard_scan_site']);
   await c.close();
 });
 
 test('toda ferramenta declara as anotações que o cliente usa para decidir aprovação', async () => {
   const c = await client();
   const { tools } = await c.listTools();
+  // Quem escreve algo (servidor ou disco) tem que dizer, para o cliente pedir aprovação.
+  const escrevem = new Set(['guard_create_banner']);
   for (const tool of tools) {
-    assert.equal(tool.annotations?.readOnlyHint, true, `${tool.name} sem readOnlyHint`);
+    assert.equal(tool.annotations?.readOnlyHint, !escrevem.has(tool.name), `${tool.name} com readOnlyHint errado`);
     assert.equal(tool.annotations?.destructiveHint, false, `${tool.name} sem destructiveHint`);
     assert.equal(typeof tool.annotations?.openWorldHint, 'boolean', `${tool.name} sem openWorldHint`);
   }

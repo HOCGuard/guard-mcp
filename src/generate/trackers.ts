@@ -129,6 +129,8 @@ export const TRACKER_RULES: TrackerRule[] = [
   },
 ];
 
+import { codeOf } from './ast.ts';
+
 export interface SourceFile {
   path: string;
   content: string;
@@ -146,7 +148,8 @@ export function detectTrackers(files: SourceFile[]): DetectedTracker[] {
   const found = new Map<string, DetectedTracker>();
   for (const file of files) {
     for (const rule of TRACKER_RULES) {
-      if (!rule.patterns.some((p) => p.test(file.content))) continue;
+      const code = codeOf(file);
+      if (!rule.patterns.some((p) => p.test(code))) continue;
       const entry = found.get(rule.id) ?? {
         id: rule.id,
         provider: rule.provider,

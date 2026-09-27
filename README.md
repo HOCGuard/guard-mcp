@@ -86,28 +86,40 @@ No arquivo de configuração de MCP do cliente:
 
 ## Como usar
 
-Dentro do projeto, peça em linguagem natural:
+O caminho mais curto é o roteiro pronto. No Claude Code:
 
 ```text
-Coloque um banner de cookies conforme a LGPD neste site.
+/mcp__hoc-guard__guard-secure-ship
 ```
 
-O agente chama `guard_generate_cookie_banner`, que:
+Em qualquer cliente MCP ele aparece como o prompt **guard-secure-ship**. O agente diagnostica o
+projeto, mostra o plano, pede confirmação, aplica, gera a política em rascunho e verifica de novo.
 
-1. **Lê o projeto na sua máquina** e detecta os rastreadores em uso (Google Analytics, GTM,
-   Meta Pixel, TikTok, LinkedIn, Hotjar, Clarity, Vercel Analytics).
-2. **Gera a integração do banner** para carregar antes de qualquer tag.
-3. **Bloqueia cada rastreador até o consentimento**, na finalidade certa.
+Ou peça em linguagem natural, dentro do projeto:
 
-Depois de publicar, confira:
+```text
+Deixe este site pronto para a LGPD.
+```
+
+O que acontece por baixo:
+
+1. **Lê o projeto na sua máquina** e detecta rastreadores (Google Analytics, GTM, Meta Pixel,
+   TikTok, LinkedIn, Hotjar, Clarity, RD Station, Hotmart, Amplitude, Mixpanel, Segment e outros),
+   formulários com dado pessoal e serviços que levam dado para fora do Brasil.
+2. **Gera a integração do banner** para carregar antes de qualquer tag e bloqueia cada rastreador
+   até o consentimento, na finalidade certa. Só com cookies essenciais, gera um aviso informativo.
+3. **Adiciona consentimento aos formulários** e escreve a política de privacidade em rascunho a
+   partir do que o app realmente faz.
+
+Depois de publicar, confira o site no ar:
 
 ```text
 Verifique se o banner do meu site realmente bloqueia os rastreadores.
 ```
 
-> [!IMPORTANT]
-> Por enquanto o banner usa um `banner_id` criado no painel do HOC Guard. Inclua no pedido:
-> *"use o banner_id bn_..."*. A criação sem conta pelo próprio MCP está a caminho.
+> [!NOTE]
+> A análise do projeto é estática: não vê tags injetadas em runtime (GTM, CMS). Por isso o
+> diagnóstico nunca diz "conforme"; a confirmação vem da varredura do site publicado.
 
 ## Ferramentas
 
@@ -119,6 +131,7 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 | `guard_make_compliant` | Um comando: roda o diagnóstico e devolve banner, pontos de consentimento, política e um checklist com a nota antes e depois |
 | `guard_generate_policy` | Rascunho de política de privacidade que descreve os rastreadores, campos e terceiros que o app realmente usa |
 | `guard_explain` | Explica um achado em português: o que é, por que importa, o que a LGPD diz e como corrigir |
+| `guard_create_banner` | Cria o banner do site sem precisar de conta e devolve o `banner_id`. O comprovante de posse fica só na sua máquina |
 | `guard_scan_site` | Inicia a varredura de um site publicado. Abre um navegador de verdade, aceita e rejeita o banner e observa o que dispara em cada caso |
 | `guard_get_scan_status` | Diz se a varredura terminou. Leva cerca de dois minutos |
 | `guard_get_scan_results` | Devolve os achados do mais grave para o menos grave, com a nota geral |
@@ -135,6 +148,17 @@ traz só o que precisa de atenção; passe `include_passed` para ver também o q
 | `GUARD_SERVICE_TOKEN` | (nenhum) | Token exigido pelo serviço de varredura, quando ele estiver protegido |
 | `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
 | `GUARD_REQUEST_TIMEOUT_MS` | `15000` | Tempo limite de cada chamada, não da varredura |
+| `GUARD_TELEMETRY` | desligada | `1` liga a telemetria de uso anônima (ver abaixo) |
+| `GUARD_TELEMETRY_URL` | origem do SDK + `/api/v1/public/mcp/telemetry` | Para onde vão os eventos |
+| `GUARD_HOME` | sua pasta pessoal | Onde fica `.hocguard/` (id de instalação e banners criados) |
+
+### Telemetria
+
+Desligada por padrão. Com `GUARD_TELEMETRY=1`, cada chamada de ferramenta envia um evento com
+**apenas**: nome da ferramenta, versão, sucesso ou erro, duração, o modo gerado, o framework, a
+contagem de achados, a nota e o nome do agente, mais um id de instalação aleatório. **Nunca** código,
+caminho de arquivo, URL varrida, nome de projeto ou dado pessoal. Falha no envio nunca afeta a
+ferramenta. O contrato está em `src/telemetry.ts` e é recusado no servidor se vier com campo a mais.
 
 ## Princípios
 
@@ -145,6 +169,11 @@ traz só o que precisa de atenção; passe `include_passed` para ver também o q
 | ⚖️ **Conformidade nunca é limitada** | O que é grátis é conforme. O pago é conveniência e escala |
 | 🪪 **Varredura profunda só com prova de propriedade** | Banco de dados e repositório privado exigem comprovação de que o alvo é seu |
 | 🧱 **Saída é dado, não instrução** | O que voltar de um site varrido nunca é tratado como comando pelo agente |
+
+## Skill
+
+`skills/guard-secure-ship/SKILL.md` traz o mesmo roteiro do prompt para agentes que usam skills.
+Ela é gerada de `src/workflow.ts` com `npm run gen:skill`; um teste falha se as duas divergirem.
 
 ## Desenvolvimento
 
