@@ -34,6 +34,10 @@ export class AuditorClient {
     try {
       response = await fetch(`${this.#config.apiUrl}${path}`, {
         ...init,
+        headers: {
+          ...init?.headers,
+          ...(this.#config.serviceToken ? { 'X-Service-Token': this.#config.serviceToken } : {}),
+        },
         signal: AbortSignal.timeout(this.#config.requestTimeoutMs),
       });
     } catch (cause) {

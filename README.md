@@ -127,6 +127,7 @@ traz só o que precisa de atenção; passe `include_passed` para ver também o q
 |---|---|---|
 | `GUARD_SDK_URL` | `https://guard.hoc.app.br/sdk/banner.js` | De onde o site carrega o banner |
 | `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura |
+| `GUARD_SERVICE_TOKEN` | (nenhum) | Token exigido pelo serviço de varredura, quando ele estiver protegido |
 | `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
 | `GUARD_REQUEST_TIMEOUT_MS` | `15000` | Tempo limite de cada chamada, não da varredura |
 
