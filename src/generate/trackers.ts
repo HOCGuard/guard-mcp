@@ -71,6 +71,62 @@ export const TRACKER_RULES: TrackerRule[] = [
     consentMode: false,
     patterns: [/@vercel\/analytics/],
   },
+  {
+    id: 'google-ads',
+    provider: 'Google Ads',
+    purpose: 'marketing',
+    consentMode: true,
+    patterns: [/googletagmanager\.com\/gtag\/js\?id=AW-/, /\bgtag\(\s*['"]event['"]\s*,\s*['"]conversion['"]/, /\bAW-\d{6,}/],
+  },
+  {
+    id: 'rd-station',
+    provider: 'RD Station',
+    purpose: 'marketing',
+    consentMode: false,
+    patterns: [/d335luupugsy2\.cloudfront\.net/, /rdstation/i, /RDStationForms/],
+  },
+  {
+    id: 'hotmart',
+    provider: 'Hotmart',
+    purpose: 'marketing',
+    consentMode: false,
+    patterns: [/hotmart\.com\/[^'"]*checkout/, /hmViewProduct/, /static\.hotmart\.com/],
+  },
+  {
+    id: 'amplitude',
+    provider: 'Amplitude',
+    purpose: 'analytics',
+    consentMode: false,
+    patterns: [/@amplitude\/analytics-browser/, /cdn\.amplitude\.com/, /amplitude\.(init|getInstance)\(/],
+  },
+  {
+    id: 'mixpanel',
+    provider: 'Mixpanel',
+    purpose: 'analytics',
+    consentMode: false,
+    patterns: [/mixpanel-browser/, /cdn\.mxpnl\.com/, /mixpanel\.init\(/],
+  },
+  {
+    id: 'segment',
+    provider: 'Segment',
+    purpose: 'analytics',
+    consentMode: false,
+    patterns: [/cdn\.segment\.com\/analytics\.js/, /@segment\/analytics-next/, /analytics\.load\(\s*['"][A-Za-z0-9]/],
+  },
+  {
+    id: 'intercom',
+    provider: 'Intercom',
+    purpose: 'functional',
+    consentMode: false,
+    patterns: [/widget\.intercom\.io/, /@intercom\/messenger-js-sdk/, /window\.intercomSettings/],
+  },
+  {
+    id: 'posthog',
+    provider: 'PostHog',
+    purpose: 'analytics',
+    consentMode: false,
+    patterns: [/posthog-js/, /app\.posthog\.com/, /posthog\.init\(/],
+  },
 ];
 
 export interface SourceFile {

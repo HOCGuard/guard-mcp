@@ -1,30 +1,8 @@
 import * as z from 'zod';
-import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { detectRouter, detectTrackers, type SourceFile } from '../generate/trackers.ts';
+import { detectRouter, detectTrackers } from '../generate/trackers.ts';
 import { buildBannerIntegration } from '../generate/banner.ts';
-
-const SOURCE_EXT = /\.(t|j)sx?$|\.html?$|\.mdx?$/;
-const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'out', 'coverage']);
-const MAX_FILES = 2000;
-
-async function collect(root: string): Promise<SourceFile[]> {
-  const files: SourceFile[] = [];
-  async function walk(dir: string): Promise<void> {
-    for (const entry of await readdir(dir, { withFileTypes: true })) {
-      if (files.length >= MAX_FILES) return;
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) await walk(full);
-      } else if (SOURCE_EXT.test(entry.name)) {
-        files.push({ path: relative(root, full), content: await readFile(full, 'utf8') });
-      }
-    }
-  }
-  await walk(root);
-  return files;
-}
+import { collect } from '../generate/collect.ts';
 
 export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
   server.registerTool(

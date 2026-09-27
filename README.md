@@ -113,7 +113,9 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 
 | Ferramenta | O que faz |
 |---|---|
-| `guard_generate_cookie_banner` | Lê o projeto Next localmente, detecta os rastreadores e devolve a integração do banner com cada um bloqueado até o consentimento |
+| `guard_generate_cookie_banner` | Lê o projeto Next localmente, detecta os rastreadores e devolve a conformidade de cookies: banner de consentimento (se há analytics/marketing) ou aviso informativo (se só há cookies essenciais) |
+| `guard_add_consent_point` | Acha formulários que coletam dado pessoal sem consentimento e devolve o ponto de coleta (checkbox com base legal e link de política) |
+| `guard_check_compliance` | Diagnóstico local: aponta tracker sem consentimento, formulário sem consentimento e falta de link de política, com nota de 0 a 100. Não varre o site publicado |
 | `guard_scan_site` | Inicia a varredura de um site publicado. Abre um navegador de verdade, aceita e rejeita o banner e observa o que dispara em cada caso |
 | `guard_get_scan_status` | Diz se a varredura terminou. Leva cerca de dois minutos |
 | `guard_get_scan_results` | Devolve os achados do mais grave para o menos grave, com a nota geral |
