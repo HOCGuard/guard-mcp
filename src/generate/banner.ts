@@ -96,10 +96,57 @@ function trackerFix(tracker: DetectedTracker): GeneratedFile[] {
   }));
 }
 
-export function buildBannerIntegration(plan: BannerPlan): { files: GeneratedFile[]; purposes: string[]; warnings: string[] } {
+// Aviso informativo, para sites que só têm cookies essenciais (sessão, login,
+// CSRF). A LGPD não exige consentimento para esses, mas exige transparência:
+// informar que existem e linkar a política. É uma barra informativa, não uma
+// parede de aceitar/recusar.
+function noticeFile(): GeneratedFile {
+  return {
+    path: 'components/CookieNotice.tsx',
+    action: 'create',
+    code: [
+      "'use client';",
+      "import { useEffect, useState } from 'react';",
+      '',
+      'export function CookieNotice() {',
+      '  const [visivel, setVisivel] = useState(false);',
+      '  useEffect(() => {',
+      "    try { setVisivel(localStorage.getItem('cookie-aviso') !== 'ok'); } catch { setVisivel(true); }",
+      '  }, []);',
+      '  if (!visivel) return null;',
+      "  function ok() { try { localStorage.setItem('cookie-aviso', 'ok'); } catch {} setVisivel(false); }",
+      '  return (',
+      '    <div role="region" aria-label="Aviso de cookies" style={{ position: \'fixed\', bottom: 0, left: 0, right: 0, padding: \'1rem\', background: \'#111\', color: \'#fff\', display: \'flex\', gap: \'1rem\', alignItems: \'center\', justifyContent: \'center\', flexWrap: \'wrap\', zIndex: 9999 }}>',
+      '      <span>Usamos apenas cookies essenciais para o funcionamento do site. Saiba mais na nossa <a href="/politica-de-privacidade" style={{ color: \'#fff\', textDecoration: \'underline\' }}>Política de Privacidade</a>.</span>',
+      '      <button onClick={ok} style={{ padding: \'0.5rem 1rem\', borderRadius: 6, border: 0, cursor: \'pointer\' }}>Entendi</button>',
+      '    </div>',
+      '  );',
+      '}',
+    ].join('\n'),
+    note: 'Barra informativa (sem consentimento) para cookies essenciais. Importe e renderize <CookieNotice /> no layout raiz. Ajuste o link para a URL real da sua política.',
+  };
+}
+
+export type IntegrationMode = 'consent-gate' | 'notice';
+
+export function buildBannerIntegration(plan: BannerPlan): { mode: IntegrationMode; files: GeneratedFile[]; purposes: string[]; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // Sem rastreador não essencial: a LGPD não pede consentimento, só
+  // transparência. Gera o aviso informativo em vez de uma parede inócua.
+  if (plan.trackers.length === 0) {
+    warnings.push(
+      'Nenhum rastreador não essencial no código. Gerei um aviso informativo (LGPD exige transparência mesmo só com cookies essenciais), não uma parede de consentimento.',
+    );
+    warnings.push('Se algum rastreador é injetado por GTM ou CMS, rode guard_scan_site no site publicado: se houver analytics/marketing, troque para o banner de consentimento.');
+    if (plan.router === 'unknown') {
+      warnings.push('Não achei app/layout nem pages/_document; confirme onde fica o layout raiz para importar o <CookieNotice />.');
+    }
+    return { mode: 'notice', files: [noticeFile()], purposes: ['necessary'], warnings };
+  }
+
   const files = [layoutFile(plan), ...plan.trackers.flatMap(trackerFix)];
   const purposes = ['necessary', ...new Set(plan.trackers.map((t) => t.purpose))];
-  const warnings: string[] = [];
   if (!plan.bannerId) {
     warnings.push(
       `Sem banner_id: troque ${PLACEHOLDER_ID} pelo id do banner criado no painel do HOC Guard. A criação anônima pelo MCP (Hguard-1424) ainda não está no ar.`,
@@ -108,10 +155,7 @@ export function buildBannerIntegration(plan: BannerPlan): { files: GeneratedFile
   if (plan.router === 'unknown') {
     warnings.push('Não achei app/layout nem pages/_document; assumi App Router. Confirme onde fica o layout raiz.');
   }
-  if (plan.trackers.length === 0) {
-    warnings.push('Nenhum rastreador conhecido no código. Se algum é injetado por GTM ou por CMS, rode guard_scan_site no site publicado para confirmar.');
-  }
-  return { files, purposes, warnings };
+  return { mode: 'consent-gate', files, purposes, warnings };
 }
 
 function indent(block: string, spaces: number): string {

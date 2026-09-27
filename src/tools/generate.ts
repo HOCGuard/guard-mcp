@@ -31,7 +31,7 @@ export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
     'guard_generate_cookie_banner',
     {
       description:
-        'Gera o banner de cookies do HOC Guard para um projeto Next.js, conforme a LGPD. Lê o código localmente (nada sai da máquina), detecta os rastreadores que o app usa (Google Analytics, GTM, Meta Pixel, Hotjar, Clarity e outros) e devolve o código para carregar o banner.js antes de tudo e bloquear cada rastreador até o consentimento. Informe project_path com a raiz do projeto, ou files com o conteúdo quando o código ainda não está salvo. Não altera arquivos: aplique as mudanças devolvidas.',
+        'Gera a conformidade de cookies do HOC Guard para um projeto Next.js, conforme a LGPD. Lê o código localmente (nada sai da máquina) e detecta os rastreadores (Google Analytics, GTM, Meta Pixel, Hotjar, Clarity e outros). Se houver rastreador não essencial, devolve o banner de consentimento que carrega o banner.js antes de tudo e bloqueia cada tracker até o aceite (mode consent-gate). Se só houver cookies essenciais, devolve um aviso informativo com link para a política, sem parede de consentimento (mode notice), porque a LGPD exige transparência mas não consentimento nesse caso. Informe project_path com a raiz do projeto, ou files com o conteúdo quando o código ainda não está salvo. Não altera arquivos: aplique as mudanças devolvidas.',
       inputSchema: z.object({
         project_path: z.string().min(1).optional(),
         files: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
@@ -56,6 +56,7 @@ export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
         const result = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers });
         const payload = {
           framework: 'nextjs',
+          mode: result.mode,
           router,
           trackers: trackers.map(({ provider, purpose, files }) => ({ provider, purpose, files })),
           purposes: result.purposes,
