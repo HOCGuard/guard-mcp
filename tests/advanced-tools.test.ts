@@ -62,3 +62,46 @@ test('guard_make_compliant devolve checklist, banner, consentimento e política'
   assert.ok(out['consent_points']['changes'].some((f: any) => f.path === 'components/ConsentField.tsx'));
   assert.match(out['policy']['policy_markdown'], /Política de Privacidade/);
 });
+
+test('multiframework: Vite gera integração genérica por script, não Next', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_generate_cookie_banner', arguments: { files: [
+    { path: 'package.json', content: '{ "dependencies": { "vite": "^5", "react": "^18" } }' },
+    { path: 'src/main.tsx', content: "import ReactGA from 'react-ga4'; ReactGA.initialize('G-X');" },
+  ] } }));
+  assert.equal(out['framework'], 'vite');
+  assert.ok(out['changes'].some((f: any) => /index\.html/.test(f.path)));
+});
+
+test('idempotência: não gera de novo se banner.js já existe', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_generate_cookie_banner', arguments: { files: [
+    { path: 'app/layout.tsx', content: '<Script src="https://x/sdk/banner.js" data-banner-id="bn_1" />' },
+  ] } }));
+  assert.equal(out['mode'], 'already-installed');
+  assert.deepEqual(out['changes'], []);
+});
+
+test('check devolve método, confiança e evidência', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_check_compliance', arguments: { files: [
+    { path: 'app/layout.tsx', content: "import { GoogleAnalytics } from '@next/third-parties/google';" },
+  ] } }));
+  assert.match(out['metodo'], /estática/);
+  const tracker = out['findings'].find((f: any) => f.code === 'tracker-sem-consentimento');
+  assert.equal(tracker.confidence, 'media');
+  assert.match(tracker.evidence, /app\/layout\.tsx:\d+/);
+});
+
+test('relatório estático nunca diz "conforme"', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_check_compliance', arguments: { files: [{ path: 'app/page.tsx', content: 'export default function P(){ return null; }' }] } }));
+  assert.doesNotMatch(out['report_markdown'], /Conforme/);
+  assert.match(out['report_markdown'], /guard_scan_site/);
+});
+
+test('política traz cabeçalho de rascunho', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_generate_policy', arguments: { files: [{ path: 'app/p.tsx', content: '<input type="email" />' }] } }));
+  assert.match(out['policy_markdown'], /RASCUNHO/);
+});

@@ -3,10 +3,13 @@ import type { Finding } from './compliance.ts';
 // Relatório de conformidade em Markdown, para o fundador mandar a cliente ou DPO.
 // A saída JSON serve ao agente; este texto serve a humanos.
 
+// Análise estática nunca declara "conforme": não vê tracker injetado em runtime
+// (GTM, CMS). O selo verde só sai com guard_scan_site no site publicado
+// (cenário 8). Aqui a leitura é sempre sobre o código, não sobre o site.
 function selo(score: number): string {
-  if (score >= 90) return 'Conforme';
+  if (score >= 90) return 'Sem problemas aparentes no código';
   if (score >= 60) return 'Ajustes necessários';
-  return 'Não conforme';
+  return 'Problemas graves no código';
 }
 
 export function buildReport(score: number, findings: Finding[], siteName = '[site]'): string {
@@ -17,6 +20,10 @@ export function buildReport(score: number, findings: Finding[], siteName = '[sit
   linhas.push(`_Gerado em ${hoje} pelo HOC Guard. Análise estática do código._`);
   linhas.push('');
   linhas.push(`## Nota: ${score}/100 — ${selo(score)}`);
+  linhas.push('');
+  linhas.push('> Esta é uma análise estática do código. Ela não vê rastreadores injetados em');
+  linhas.push('> runtime (GTM, CMS, tags de terceiros). Para confirmar a conformidade do site no ar,');
+  linhas.push('> rode guard_scan_site na URL publicada.');
   linhas.push('');
   if (findings.length === 0) {
     linhas.push('Nenhum problema encontrado na análise estática do código.');

@@ -1,23 +1,20 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { collect } from '../generate/collect.ts';
+import { loadSources } from '../generate/collect.ts';
 import { checkCompliance, scoreOf } from '../generate/compliance.ts';
 import { buildPolicy } from '../generate/policy.ts';
 import { buildReport } from '../generate/report.ts';
 import { explain, EXPLANATIONS } from '../generate/explain.ts';
-import { detectRouter, detectTrackers, type SourceFile } from '../generate/trackers.ts';
+import { detectRouter, detectTrackers } from '../generate/trackers.ts';
 import { detectForms } from '../generate/forms.ts';
-import { buildBannerIntegration } from '../generate/banner.ts';
+import { buildBannerIntegration, bannerInstalled } from '../generate/banner.ts';
 import { buildConsentPoints } from '../generate/consent-point.ts';
+import { detectFramework } from '../generate/framework.ts';
 
 const projectSchema = z.object({
   project_path: z.string().min(1).optional(),
   files: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
 });
-
-async function sources(project_path: string | undefined, files: SourceFile[] | undefined): Promise<SourceFile[]> {
-  return files?.length ? files : await collect(project_path!);
-}
 
 function text(payload: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
@@ -45,7 +42,8 @@ export function registerAdvancedTools(server: McpServer, sdkUrl: string): void {
     async ({ project_path, files, site_name, controller_name, dpo_email }) => {
       if (!project_path && !files?.length) return needInput();
       try {
-        const { markdown, warnings } = buildPolicy(await sources(project_path, files), {
+        const { files: src } = await loadSources(project_path, files);
+        const { markdown, warnings } = buildPolicy(src, {
           siteName: site_name, controllerName: controller_name, dpoEmail: dpo_email,
         });
         return text({ policy_markdown: markdown, warnings });
@@ -83,12 +81,13 @@ export function registerAdvancedTools(server: McpServer, sdkUrl: string): void {
     async ({ project_path, files, banner_id, dpo_email }) => {
       if (!project_path && !files?.length) return needInput();
       try {
-        const src = await sources(project_path, files);
+        const { files: src } = await loadSources(project_path, files);
         const antes = checkCompliance(src);
         const trackers = detectTrackers(src);
         const router = detectRouter(src);
         const forms = detectForms(src);
-        const banner = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers });
+        const framework = detectFramework(src);
+        const banner = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled: bannerInstalled(src) });
         const consent = buildConsentPoints(forms);
         const policy = buildPolicy(src, { dpoEmail: dpo_email });
 

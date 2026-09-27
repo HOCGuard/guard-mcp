@@ -33,12 +33,13 @@ export function buildPolicy(files: SourceFile[], input: PolicyInput = {}): { mar
 
   const campos = [...new Set(forms.flatMap((f) => f.fields))];
   const linhas: string[] = [];
+  linhas.push('<!-- RASCUNHO, NÃO PUBLICAR SEM REVISÃO JURÍDICA -->');
   linhas.push(`# Política de Privacidade — ${site}`);
   linhas.push('');
-  linhas.push(`_Última atualização: ${hoje}. Base: Lei 13.709/2018 (LGPD)._`);
+  linhas.push('> **RASCUNHO. NÃO PUBLIQUE SEM REVISÃO JURÍDICA.** Gerado a partir do que foi');
+  linhas.push('> detectado no código do site. Complete os campos entre colchetes e revise com o jurídico.');
   linhas.push('');
-  linhas.push('> Rascunho gerado a partir do que foi detectado no código do site. Revise com o');
-  linhas.push('> jurídico antes de publicar e complete os campos entre colchetes.');
+  linhas.push(`_Última atualização: ${hoje}. Base: Lei 13.709/2018 (LGPD)._`);
   linhas.push('');
   linhas.push('## 1. Quem é o controlador');
   linhas.push(`O controlador dos dados é ${controller}. Encarregado (DPO): ${dpo}.`);
