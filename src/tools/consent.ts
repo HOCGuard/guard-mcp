@@ -1,20 +1,15 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { collect } from '../generate/collect.ts';
+import { loadSources } from '../generate/collect.ts';
 import { detectForms } from '../generate/forms.ts';
 import { buildConsentPoints } from '../generate/consent-point.ts';
 import { checkCompliance } from '../generate/compliance.ts';
 import { buildReport } from '../generate/report.ts';
-import type { SourceFile } from '../generate/trackers.ts';
 
 const inputSchema = z.object({
   project_path: z.string().min(1).optional(),
   files: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
 });
-
-async function sources(project_path: string | undefined, files: SourceFile[] | undefined): Promise<SourceFile[]> {
-  return files?.length ? files : await collect(project_path!);
-}
 
 function text(payload: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
@@ -42,7 +37,8 @@ export function registerConsentTools(server: McpServer): void {
     async ({ project_path, files }) => {
       if (!project_path && !files?.length) return needInput();
       try {
-        const forms = detectForms(await sources(project_path, files));
+        const { files: src } = await loadSources(project_path, files);
+        const forms = detectForms(src);
         const result = buildConsentPoints(forms);
         return text({
           forms: forms.map(({ path, fields, hasConsent }) => ({ path, fields, hasConsent })),
@@ -72,8 +68,9 @@ export function registerConsentTools(server: McpServer): void {
     async ({ project_path, files }) => {
       if (!project_path && !files?.length) return needInput();
       try {
-        const { findings, score } = checkCompliance(await sources(project_path, files));
-        return text({ score, total: findings.length, findings, report_markdown: buildReport(score, findings) });
+        const { files: src } = await loadSources(project_path, files);
+        const { findings, score, metodo } = checkCompliance(src);
+        return text({ score, metodo, total: findings.length, findings, report_markdown: buildReport(score, findings) });
       } catch (error) {
         return { content: [{ type: 'text' as const, text: `Não consegui ler o projeto: ${String(error)}` }], isError: true as const };
       }

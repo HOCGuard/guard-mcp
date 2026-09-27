@@ -1,4 +1,5 @@
 import type { DetectedTracker, Router } from './trackers.ts';
+import type { Framework } from './framework.ts';
 
 // Gera a integração do banner.js do HOC Guard (hoc-mod-gcc/sdk) num projeto
 // Next. O SDK já existe: aqui só automatizamos o passo que hoje é manual no
@@ -9,6 +10,9 @@ export interface BannerPlan {
   bannerId: string | null;
   sdkUrl: string;
   trackers: DetectedTracker[];
+  framework?: Framework;
+  // Idempotência (cenário 4): true quando o banner.js já está no projeto.
+  alreadyInstalled?: boolean;
 }
 
 export interface GeneratedFile {
@@ -127,10 +131,39 @@ function noticeFile(): GeneratedFile {
   };
 }
 
-export type IntegrationMode = 'consent-gate' | 'notice';
+// Integração genérica por <script>, para frameworks que não são Next.js. Em vez
+// de assumir Next e gerar código errado em silêncio (cenário 1).
+function genericScriptFile(plan: BannerPlan): GeneratedFile {
+  const id = plan.bannerId ?? PLACEHOLDER_ID;
+  const origin = new URL(plan.sdkUrl).origin;
+  return {
+    path: 'index.html (ou o HTML raiz do seu framework)',
+    action: 'edit',
+    code: [
+      '<!-- no <head>, antes de qualquer outro script: -->',
+      `<script src="${plan.sdkUrl}" data-banner-id="${id}" data-api-base="${origin}"></script>`,
+    ].join('\n'),
+    note: 'Framework não-Next: carregue o banner.js pela tag <script> no HTML raiz, antes de qualquer rastreador. Rode o build depois e confirme que o data-banner-id aparece no HTML final.',
+  };
+}
+
+export type IntegrationMode = 'consent-gate' | 'notice' | 'already-installed';
 
 export function buildBannerIntegration(plan: BannerPlan): { mode: IntegrationMode; files: GeneratedFile[]; purposes: string[]; warnings: string[] } {
   const warnings: string[] = [];
+
+  // Idempotência (cenário 4): já tem o banner.js, não gera de novo.
+  if (plan.alreadyInstalled) {
+    return {
+      mode: 'already-installed',
+      files: [],
+      purposes: ['necessary', ...new Set(plan.trackers.map((t) => t.purpose))],
+      warnings: ['O banner.js do HOC Guard já está no projeto. Não gerei nada para não duplicar. Rode guard_check_compliance para conferir se está bloqueando os rastreadores.'],
+    };
+  }
+
+  const framework = plan.framework ?? 'nextjs';
+  const naoNext = framework !== 'nextjs' && framework !== 'unknown';
 
   // Sem rastreador não essencial: a LGPD não pede consentimento, só
   // transparência. Gera o aviso informativo em vez de uma parede inócua.
@@ -145,14 +178,17 @@ export function buildBannerIntegration(plan: BannerPlan): { mode: IntegrationMod
     return { mode: 'notice', files: [noticeFile()], purposes: ['necessary'], warnings };
   }
 
-  const files = [layoutFile(plan), ...plan.trackers.flatMap(trackerFix)];
+  const layout = naoNext ? genericScriptFile(plan) : layoutFile(plan);
+  const files = [layout, ...plan.trackers.flatMap(trackerFix)];
   const purposes = ['necessary', ...new Set(plan.trackers.map((t) => t.purpose))];
   if (!plan.bannerId) {
     warnings.push(
       `Sem banner_id: troque ${PLACEHOLDER_ID} pelo id do banner criado no painel do HOC Guard. A criação anônima pelo MCP (Hguard-1424) ainda não está no ar.`,
     );
   }
-  if (plan.router === 'unknown') {
+  if (naoNext) {
+    warnings.push(`Framework detectado: ${framework}. Gerei a integração genérica por <script>; ajuste o local no HTML raiz do seu framework.`);
+  } else if (plan.router === 'unknown') {
     warnings.push('Não achei app/layout nem pages/_document; assumi App Router. Confirme onde fica o layout raiz.');
   }
   return { mode: 'consent-gate', files, purposes, warnings };
@@ -161,4 +197,9 @@ export function buildBannerIntegration(plan: BannerPlan): { mode: IntegrationMod
 function indent(block: string, spaces: number): string {
   const pad = ' '.repeat(spaces);
   return block.split('\n').map((l) => pad + l).join('\n');
+}
+
+// Detecta se o banner.js do HOC Guard já está no projeto (cenário 4).
+export function bannerInstalled(files: { content: string }[]): boolean {
+  return files.some((f) => /sdk\/banner\.js|data-banner-id|HOCGuardSettings/.test(f.content));
 }

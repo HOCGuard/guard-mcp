@@ -1,8 +1,9 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { detectRouter, detectTrackers } from '../generate/trackers.ts';
-import { buildBannerIntegration } from '../generate/banner.ts';
-import { collect } from '../generate/collect.ts';
+import { buildBannerIntegration, bannerInstalled } from '../generate/banner.ts';
+import { loadSources } from '../generate/collect.ts';
+import { detectFramework } from '../generate/framework.ts';
 
 export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
   server.registerTool(
@@ -28,18 +29,22 @@ export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
         return { content: [{ type: 'text' as const, text: 'Informe project_path ou files.' }], isError: true as const };
       }
       try {
-        const sources = files?.length ? files : await collect(project_path!);
+        const { files: sources, truncated } = await loadSources(project_path, files);
         const trackers = detectTrackers(sources);
         const router = detectRouter(sources);
-        const result = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers });
+        const framework = detectFramework(sources);
+        const alreadyInstalled = bannerInstalled(sources);
+        const result = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled });
+        const warnings = [...result.warnings];
+        if (truncated) warnings.push('Projeto grande: li os primeiros 2000 arquivos (diretórios app/src/pages/components primeiro). Confirme que o layout raiz foi incluído.');
         const payload = {
-          framework: 'nextjs',
+          framework,
           mode: result.mode,
           router,
           trackers: trackers.map(({ provider, purpose, files }) => ({ provider, purpose, files })),
           purposes: result.purposes,
           changes: result.files,
-          warnings: result.warnings,
+          warnings,
         };
         return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
       } catch (error) {
