@@ -1,13 +1,13 @@
 {
   "name": "@hocguard/mcp",
-  "version": "0.0.1",
-  "description": "Servidor MCP do HOC Guard: varredura de segurança e privacidade para apps, e verificação de skills e servidores MCP",
+  "version": "0.1.0",
+  "description": "Servidor MCP do HOC Guard: banner de cookies, consentimento e varredura de privacidade conforme a LGPD, de dentro do seu agente de código",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "guard-mcp": "./dist/index.js"
+    "guard-mcp": "dist/index.js"
   },
-  "main": "./dist/index.js",
+  "main": "dist/index.js",
   "files": [
     "dist"
   ],
@@ -25,11 +25,13 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "security",
     "privacy",
     "lgpd",
-    "sast",
-    "skill-verification"
+    "gdpr",
+    "cookie-banner",
+    "consent",
+    "nextjs",
+    "security"
   ],
   "scripts": {
     "prepare": "tsc",
@@ -47,5 +49,8 @@
     "@modelcontextprotocol/client": "^2.1.0",
     "@types/node": "^24.0.0",
     "typescript": "^5.7.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
