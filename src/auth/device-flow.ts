@@ -29,14 +29,19 @@ export class DeviceFlowError extends Error {
 }
 
 type FetchImpl = typeof fetch;
-type Sleep = (ms: number) => Promise<void>;
 
 interface ClientOpts {
   fetchImpl?: FetchImpl;
-  sleep?: Sleep;
 }
 
-const defaultSleep: Sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Resultado de UMA tentativa de polling. O tool guard_login_check mapeia cada
+// kind numa mensagem pro usuário, sem bloquear.
+export type PollResult =
+  | { kind: 'token'; token: DeviceTokenResponse }
+  | { kind: 'pending' }
+  | { kind: 'slow_down' }
+  | { kind: 'expired' }
+  | { kind: 'denied' };
 
 async function parseError(res: Response): Promise<string> {
   try {
@@ -73,68 +78,56 @@ export async function requestDeviceCode(
   return (await res.json()) as DeviceCodeResponse;
 }
 
-// Passo 2 (RFC 8628 §3.4/3.5): faz polling até aprovar, negar ou expirar.
-// Respeita authorization_pending, slow_down (aumenta o intervalo) e expired_token.
-export async function pollForToken(
+// Passo 2 (RFC 8628 §3.4/3.5): UMA tentativa de polling. Não bloqueia: devolve o
+// estado atual (token, pending, slow_down, expired, denied). Quem decide esperar
+// e tentar de novo é o chamador (o usuário rodando guard_login_check).
+export async function pollOnce(
   authUrl: string,
-  params: { clientId: string; deviceCode: string; interval: number; expiresIn: number },
+  params: { clientId: string; deviceCode: string },
   opts: ClientOpts = {},
-): Promise<DeviceTokenResponse> {
+): Promise<PollResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const sleep = opts.sleep ?? defaultSleep;
-  let intervalSeconds = Math.max(1, params.interval || 5);
-  const deadline = Date.now() + params.expiresIn * 1000;
-
   const body = new URLSearchParams({
     grant_type: DEVICE_CODE_GRANT_TYPE,
     device_code: params.deviceCode,
     client_id: params.clientId,
   });
 
-  for (;;) {
-    if (Date.now() >= deadline) {
-      throw new DeviceFlowError('O código expirou antes da autorização. Rode guard_login de novo.');
-    }
+  let res: Response;
+  try {
+    res = await fetchImpl(`${authUrl}/oauth/device/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+  } catch (cause) {
+    throw new DeviceFlowError(
+      `Não foi possível falar com o login do Guard: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
 
-    let res: Response;
-    try {
-      res = await fetchImpl(`${authUrl}/oauth/device/token`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-    } catch (cause) {
-      throw new DeviceFlowError(
-        `Não foi possível falar com o login do Guard: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    }
+  if (res.ok) {
+    return { kind: 'token', token: (await res.json()) as DeviceTokenResponse };
+  }
 
-    if (res.ok) {
-      return (await res.json()) as DeviceTokenResponse;
-    }
+  let error = 'invalid_request';
+  try {
+    error = ((await res.json()) as { error?: string }).error ?? error;
+  } catch {
+    // mantem invalid_request
+  }
 
-    let error = 'invalid_request';
-    try {
-      error = ((await res.json()) as { error?: string }).error ?? error;
-    } catch {
-      // mantem invalid_request
-    }
-
-    switch (error) {
-      case 'authorization_pending':
-        await sleep(intervalSeconds * 1000);
-        break;
-      case 'slow_down':
-        intervalSeconds += 5;
-        await sleep(intervalSeconds * 1000);
-        break;
-      case 'expired_token':
-        throw new DeviceFlowError('O código expirou. Rode guard_login de novo.');
-      case 'access_denied':
-        throw new DeviceFlowError('Autorização negada no navegador.');
-      default:
-        throw new DeviceFlowError(`Login falhou: ${error}`);
-    }
+  switch (error) {
+    case 'authorization_pending':
+      return { kind: 'pending' };
+    case 'slow_down':
+      return { kind: 'slow_down' };
+    case 'expired_token':
+      return { kind: 'expired' };
+    case 'access_denied':
+      return { kind: 'denied' };
+    default:
+      throw new DeviceFlowError(`Login falhou: ${error}`);
   }
 }
 

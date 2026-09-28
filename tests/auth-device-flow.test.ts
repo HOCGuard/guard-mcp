@@ -10,19 +10,18 @@ import { createServer } from '../src/server.ts';
 import { AuditorClient } from '../src/auditor-client.ts';
 import {
   requestDeviceCode,
-  pollForToken,
+  pollOnce,
   decodeJwtSubject,
   DeviceFlowError,
 } from '../src/auth/device-flow.ts';
 import {
   resolveCredentialsPath,
+  resolvePendingPath,
   saveCredentials,
   loadCredentials,
   activeToken,
   deleteCredentials,
 } from '../src/credentials.ts';
-
-const noSleep = async () => {};
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -57,45 +56,32 @@ test('requestDeviceCode erra legivel quando o auth recusa', async () => {
   );
 });
 
-test('pollForToken espera authorization_pending e depois recebe o token', async () => {
-  const respostas = [
-    jsonResponse(400, { error: 'authorization_pending' }),
-    jsonResponse(400, { error: 'authorization_pending' }),
-    jsonResponse(200, { access_token: 'jwt', token_type: 'Bearer', expires_in: 3600, scope: 'scan generate' }),
-  ];
-  let i = 0;
-  const fetchImpl = (async () => respostas[i++]!) as unknown as typeof fetch;
-  const token = await pollForToken(
-    'https://auth.x',
-    { clientId: 'guard-mcp', deviceCode: 'dc', interval: 1, expiresIn: 900 },
-    { fetchImpl, sleep: noSleep },
-  );
-  assert.equal(token.access_token, 'jwt');
-  assert.equal(i, 3);
-});
+test('pollOnce mapeia cada estado da RFC 8628', async () => {
+  const token = await pollOnce('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc' }, {
+    fetchImpl: (async () => jsonResponse(200, { access_token: 'jwt', token_type: 'Bearer', expires_in: 3600, scope: 'scan' })) as unknown as typeof fetch,
+  });
+  assert.equal(token.kind, 'token');
+  if (token.kind === 'token') assert.equal(token.token.access_token, 'jwt');
 
-test('pollForToken trata slow_down e continua', async () => {
-  const respostas = [
-    jsonResponse(400, { error: 'slow_down' }),
-    jsonResponse(200, { access_token: 'jwt', token_type: 'Bearer', expires_in: 3600, scope: 'scan' }),
-  ];
-  let i = 0;
-  const fetchImpl = (async () => respostas[i++]!) as unknown as typeof fetch;
-  const token = await pollForToken('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc', interval: 1, expiresIn: 900 }, { fetchImpl, sleep: noSleep });
-  assert.equal(token.access_token, 'jwt');
-});
+  const pend = await pollOnce('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc' }, {
+    fetchImpl: (async () => jsonResponse(400, { error: 'authorization_pending' })) as unknown as typeof fetch,
+  });
+  assert.equal(pend.kind, 'pending');
 
-test('pollForToken lanca em expired_token e em access_denied', async () => {
-  const expira = (async () => jsonResponse(400, { error: 'expired_token' })) as unknown as typeof fetch;
-  await assert.rejects(
-    pollForToken('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc', interval: 1, expiresIn: 900 }, { fetchImpl: expira, sleep: noSleep }),
-    (e: unknown) => e instanceof DeviceFlowError && /expirou/.test((e as Error).message),
-  );
-  const negado = (async () => jsonResponse(400, { error: 'access_denied' })) as unknown as typeof fetch;
-  await assert.rejects(
-    pollForToken('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc', interval: 1, expiresIn: 900 }, { fetchImpl: negado, sleep: noSleep }),
-    (e: unknown) => e instanceof DeviceFlowError && /negada/.test((e as Error).message),
-  );
+  const slow = await pollOnce('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc' }, {
+    fetchImpl: (async () => jsonResponse(400, { error: 'slow_down' })) as unknown as typeof fetch,
+  });
+  assert.equal(slow.kind, 'slow_down');
+
+  const exp = await pollOnce('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc' }, {
+    fetchImpl: (async () => jsonResponse(400, { error: 'expired_token' })) as unknown as typeof fetch,
+  });
+  assert.equal(exp.kind, 'expired');
+
+  const den = await pollOnce('https://auth.x', { clientId: 'guard-mcp', deviceCode: 'dc' }, {
+    fetchImpl: (async () => jsonResponse(400, { error: 'access_denied' })) as unknown as typeof fetch,
+  });
+  assert.equal(den.kind, 'denied');
 });
 
 test('decodeJwtSubject extrai o sub', () => {
@@ -112,22 +98,23 @@ test('credenciais: salva, le, expira e apaga sem tocar em ~', async () => {
   const cred = await loadCredentials(path);
   assert.equal(cred?.access_token, 'tok');
   assert.equal(activeToken(cred), 'tok');
-  // expirado -> null
   assert.equal(activeToken({ access_token: 'x', expires_at: Date.now() - 1, scope: '' }), null);
   assert.equal(await deleteCredentials(path), true);
   assert.equal(await loadCredentials(path), null);
   await rm(dir, { recursive: true, force: true });
 });
 
-test('resolveCredentialsPath respeita GUARD_CREDENTIALS_PATH e homeDir', () => {
+test('resolveCredentialsPath/PendingPath respeitam GUARD_CREDENTIALS_PATH e homeDir', () => {
   assert.equal(resolveCredentialsPath({ credentialsPath: '/tmp/x.json' } as any), '/tmp/x.json');
   assert.equal(resolveCredentialsPath({ homeDir: '/home/zé' } as any), '/home/zé/.hocguard/credentials.json');
+  assert.equal(resolvePendingPath({ credentialsPath: '/tmp/x.json' } as any), '/tmp/pending-login.json');
 });
 
-// --- guard_login / guard_logout via MCP --------------------------------------
+// --- guard_login / guard_login_check / guard_logout via MCP ------------------
 
 let authHttp: Server;
 let authBase: string;
+let aprovarNoCheck = true; // controla se /oauth/device/token ja aprova
 
 before(async () => {
   authHttp = createHttpServer((req, res) => {
@@ -146,9 +133,13 @@ before(async () => {
         return;
       }
       if (req.url === '/oauth/device/token') {
-        // Aprovacao imediata (sem pending) pra o teste nao esperar.
-        res.writeHead(200);
-        res.end(JSON.stringify({ access_token: fakeJwt('user-abc'), token_type: 'Bearer', expires_in: 3600, scope: 'scan generate' }));
+        if (aprovarNoCheck) {
+          res.writeHead(200);
+          res.end(JSON.stringify({ access_token: fakeJwt('user-abc'), token_type: 'Bearer', expires_in: 3600, scope: 'scan generate' }));
+        } else {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'authorization_pending' }));
+        }
         return;
       }
       res.writeHead(404);
@@ -174,24 +165,68 @@ async function mcpClient(overrides: Record<string, unknown>) {
   return c;
 }
 
-test('guard_login conecta, salva credencial e guard_logout apaga', async () => {
+function texto(result: unknown) {
+  return (result as { content: { text: string }[] }).content[0]!.text;
+}
+
+test('guard_login devolve o link na hora e nao bloqueia; guard_login_check conclui', async () => {
+  aprovarNoCheck = true;
   const dir = await mkdtemp(join(tmpdir(), 'hocguard-login-'));
   const credPath = join(dir, 'credentials.json');
   const c = await mcpClient({ authUrl: authBase, credentialsPath: credPath });
 
   const login = await c.callTool({ name: 'guard_login', arguments: {} });
-  const texto = (login as { content: { text: string }[] }).content[0]!.text;
-  assert.match(texto, /Conectado/);
-  assert.match(texto, /user-abc/);
+  assert.match(texto(login), /WXYZ-1234/);
+  assert.match(texto(login), /guard_login_check/);
+  // guard_login nao salvou credencial ainda (so o pendente).
+  assert.equal(await loadCredentials(credPath), null);
 
+  const check = await c.callTool({ name: 'guard_login_check', arguments: {} });
+  assert.match(texto(check), /Conectado/);
+  assert.match(texto(check), /user-abc/);
   const cred = await loadCredentials(credPath);
   assert.equal(cred?.access_token, fakeJwt('user-abc'));
-  assert.equal(cred?.scope, 'scan generate');
 
+  await c.close();
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('guard_login_check ainda pendente pede pra tentar de novo, sem erro', async () => {
+  aprovarNoCheck = false;
+  const dir = await mkdtemp(join(tmpdir(), 'hocguard-pend-'));
+  const credPath = join(dir, 'credentials.json');
+  const c = await mcpClient({ authUrl: authBase, credentialsPath: credPath });
+
+  await c.callTool({ name: 'guard_login', arguments: {} });
+  const check = await c.callTool({ name: 'guard_login_check', arguments: {} });
+  assert.equal((check as { isError?: boolean }).isError, undefined);
+  assert.match(texto(check), /Ainda não vi a autorização/);
+  assert.equal(await loadCredentials(credPath), null);
+
+  await c.close();
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('guard_login_check sem login em andamento avisa', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hocguard-nopend-'));
+  const c = await mcpClient({ authUrl: authBase, credentialsPath: join(dir, 'credentials.json') });
+  const check = await c.callTool({ name: 'guard_login_check', arguments: {} });
+  assert.match(texto(check), /Nenhum login em andamento/);
+  await c.close();
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('guard_logout apaga a credencial', async () => {
+  aprovarNoCheck = true;
+  const dir = await mkdtemp(join(tmpdir(), 'hocguard-logout-'));
+  const credPath = join(dir, 'credentials.json');
+  const c = await mcpClient({ authUrl: authBase, credentialsPath: credPath });
+  await c.callTool({ name: 'guard_login', arguments: {} });
+  await c.callTool({ name: 'guard_login_check', arguments: {} });
+  assert.ok(await loadCredentials(credPath));
   const logout = await c.callTool({ name: 'guard_logout', arguments: {} });
-  assert.match((logout as { content: { text: string }[] }).content[0]!.text, /encerrada/i);
+  assert.match(texto(logout), /encerrada/i);
   await assert.rejects(access(credPath));
-
   await c.close();
   await rm(dir, { recursive: true, force: true });
 });
