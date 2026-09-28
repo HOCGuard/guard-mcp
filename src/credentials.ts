@@ -10,6 +10,13 @@ export interface StoredCredentials {
   /** epoch ms de expiração (Date.now() + expires_in * 1000 no momento do login). */
   expires_at: number;
   scope: string;
+  /**
+   * Sessão de agente (Etapa 1): renova o access_token via grant refresh_token,
+   * com rotação (o servidor devolve um novo par a cada renovação). Ausente em
+   * credenciais salvas por uma versão anterior, que continuam válidas até o
+   * access_token expirar, quando então exigem guard_login de novo.
+   */
+  refresh_token?: string | undefined;
 }
 
 // Margem de seguranca: considera o token "morto" 30s antes da expiracao real,
@@ -29,7 +36,9 @@ export async function loadCredentials(path: string): Promise<StoredCredentials |
     if (typeof parsed.access_token !== 'string' || typeof parsed.expires_at !== 'number') {
       return null;
     }
-    return { access_token: parsed.access_token, expires_at: parsed.expires_at, scope: parsed.scope ?? '' };
+    const cred: StoredCredentials = { access_token: parsed.access_token, expires_at: parsed.expires_at, scope: parsed.scope ?? '' };
+    if (typeof parsed.refresh_token === 'string' && parsed.refresh_token.length > 0) cred.refresh_token = parsed.refresh_token;
+    return cred;
   } catch {
     // Arquivo ausente ou corrompido: trata como "nao logado", nao como erro.
     return null;

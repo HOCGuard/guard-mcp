@@ -1,6 +1,7 @@
 import type { Config } from './config.ts';
 import { DEFAULT_AUTH_URL } from './config.ts';
-import { resolveCredentialsPath, loadCredentials, activeToken } from './credentials.ts';
+import { resolveCredentialsPath, loadCredentials } from './credentials.ts';
+import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 
 // Cliente das finalidades do gcc na conta do usuário. Usa o Bearer do login
 // (guard_login) contra a mesma origem do issuer. Nunca publica: publicar é
@@ -93,37 +94,39 @@ export class PurposesClient {
   readonly origin: string;
   readonly #credentialsPath: string;
   readonly #timeoutMs: number;
+  readonly #tokens: TokenProvider;
 
-  constructor(config: Config) {
+  constructor(config: Config, tokens?: TokenProvider) {
     this.origin = new URL(config.authUrl ?? DEFAULT_AUTH_URL).origin;
     this.#credentialsPath = resolveCredentialsPath(config);
     this.#timeoutMs = config.requestTimeoutMs;
+    this.#tokens = tokens ?? createTokenProvider(config);
   }
 
   reviewLink(purposeId: string): string {
     return `${this.origin}/privacidade/finalidades/${encodeURIComponent(purposeId)}`;
   }
 
-  // Token lido a cada chamada, pra pegar um guard_login feito no mesmo processo.
-  // Se o token declara scopes e falta o necessário, recusa antes de chamar a API.
+  // Token via TokenProvider (renova sozinho se expirou). Credencial lida de
+  // novo só pra checar scope com o que ficou salvo (pode ter mudado numa
+  // renovação concorrente). Se o token declara scopes e falta o necessário,
+  // recusa antes de chamar a API.
   private async bearer(scope: string): Promise<string> {
-    const cred = await loadCredentials(this.#credentialsPath);
-    const token = activeToken(cred);
-    if (!cred || !token) {
+    const token = await this.#tokens.currentToken();
+    if (!token) {
       throw new PurposesError(`Você não está conectado ao HOC Guard (ou o login expirou). ${loginHint()}`, 401);
     }
-    const granted = cred.scope.split(/\s+/).filter(Boolean);
+    const cred = await loadCredentials(this.#credentialsPath);
+    const granted = (cred?.scope ?? '').split(/\s+/).filter(Boolean);
     if (granted.length > 0 && !granted.includes(scope)) {
       throw new PurposesError(missingScopeMessage(scope), 403, 'missing-scope');
     }
     return token;
   }
 
-  private async request<T>(scope: string, path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-    const token = await this.bearer(scope);
-    let response: Response;
+  private async doFetch(path: string, token: string, init?: { method?: string; body?: unknown }): Promise<Response> {
     try {
-      response = await fetch(`${this.origin}${path}`, {
+      return await fetch(`${this.origin}${path}`, {
         method: init?.method ?? 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -137,6 +140,21 @@ export class PurposesClient {
       throw new PurposesError(
         `Não foi possível falar com o HOC Guard em ${this.origin}: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
+    }
+  }
+
+  private async request<T>(scope: string, path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+    let token = await this.bearer(scope);
+    let response = await this.doFetch(path, token, init);
+
+    // Retry único em 401: token local parecia válido, servidor recusou (sessão
+    // revogada, ou perdeu a corrida de uma renovação concorrente).
+    if (response.status === 401) {
+      const renewed = await this.#tokens.forceRefresh();
+      if (renewed) {
+        token = renewed;
+        response = await this.doFetch(path, token, init);
+      }
     }
 
     const text = await response.text();

@@ -1,6 +1,6 @@
 import type { Config } from './config.ts';
 import type { RawReport } from './findings.ts';
-import { resolveCredentialsPath, loadCredentials, activeToken } from './credentials.ts';
+import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 
 export interface StartedScan {
   job_id: string;
@@ -25,26 +25,16 @@ export class AuditorError extends Error {
 
 export class AuditorClient {
   readonly #config: Config;
-  readonly #credentialsPath: string;
+  readonly #tokens: TokenProvider;
 
-  constructor(config: Config) {
+  constructor(config: Config, tokens?: TokenProvider) {
     this.#config = config;
-    this.#credentialsPath = resolveCredentialsPath(config);
+    this.#tokens = tokens ?? createTokenProvider(config);
   }
 
-  // Bearer do Device Flow (guard_login). Lido do arquivo a cada request pra pegar
-  // o token recém-salvo por um guard_login no mesmo processo. null se não logado
-  // ou token expirado.
-  private async loginToken(): Promise<string | null> {
-    const cred = await loadCredentials(this.#credentialsPath);
-    return activeToken(cred);
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const bearer = await this.loginToken();
-    let response: Response;
+  private async doFetch(path: string, bearer: string | null, init?: RequestInit): Promise<Response> {
     try {
-      response = await fetch(`${this.#config.apiUrl}${path}`, {
+      return await fetch(`${this.#config.apiUrl}${path}`, {
         ...init,
         headers: {
           ...init?.headers,
@@ -59,6 +49,22 @@ export class AuditorClient {
       throw new AuditorError(
         `Não foi possível falar com o serviço de varredura em ${this.#config.apiUrl}: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
+    }
+  }
+
+  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    let bearer = await this.#tokens.currentToken();
+    let response = await this.doFetch(path, bearer, init);
+
+    // Retry único em 401: o token local parecia válido mas o servidor recusou
+    // (revogado, ou perdeu a corrida de uma renovação concorrente). Só faz
+    // sentido tentar de novo se um bearer foi de fato usado.
+    if (bearer && response.status === 401) {
+      const renewed = await this.#tokens.forceRefresh();
+      if (renewed) {
+        bearer = renewed;
+        response = await this.doFetch(path, bearer, init);
+      }
     }
 
     const body = await response.text();

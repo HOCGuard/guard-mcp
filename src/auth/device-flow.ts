@@ -19,12 +19,27 @@ export interface DeviceTokenResponse {
   token_type: string;
   expires_in: number;
   scope: string;
+  /** Sessão de agente (Etapa 1): presente quando o servidor já emite refresh_token. */
+  refresh_token?: string;
+}
+
+export interface RefreshTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+  /** Rotação: o servidor troca o refresh_token a cada renovação. */
+  refresh_token?: string;
 }
 
 export class DeviceFlowError extends Error {
-  constructor(message: string) {
+  /** Código OAuth cru (ex: "invalid_grant"), quando disponível. */
+  readonly code: string | undefined;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'DeviceFlowError';
+    this.code = code;
   }
 }
 
@@ -52,14 +67,19 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-// Passo 1 (RFC 8628 §3.1): pede device_code + user_code.
+// Passo 1 (RFC 8628 §3.1): pede device_code + user_code. agentName/agentClient
+// (Etapa 1: sessões de agente) identificam o cliente MCP pro backend nomear a
+// sessão; omitidos, o backend usa seus próprios defaults.
 export async function requestDeviceCode(
   authUrl: string,
-  params: { clientId: string; scope: string },
+  params: { clientId: string; scope: string; agentName?: string | undefined; agentClient?: string | undefined },
   opts: ClientOpts = {},
 ): Promise<DeviceCodeResponse> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const body = new URLSearchParams({ client_id: params.clientId, scope: params.scope });
+  const bodyParams: Record<string, string> = { client_id: params.clientId, scope: params.scope };
+  if (params.agentName) bodyParams['agent_name'] = params.agentName;
+  if (params.agentClient) bodyParams['agent_client'] = params.agentClient;
+  const body = new URLSearchParams(bodyParams);
   let res: Response;
   try {
     res = await fetchImpl(`${authUrl}/oauth/device/code`, {
@@ -129,6 +149,67 @@ export async function pollOnce(
     default:
       throw new DeviceFlowError(`Login falhou: ${error}`);
   }
+}
+
+// Renova o access_token com o refresh_token guardado (grant refresh_token, RFC
+// 6749 §6). O servidor roda rotação + reuse detection: cada chamada aqui só
+// pode usar o refresh_token UMA vez (quem chama garante isso com um lock, ver
+// src/auth/session.ts). Em erro, o `code` da DeviceFlowError distingue
+// "invalid_grant" (sessão morta: precisa de guard_login de novo) de qualquer
+// outro problema (rede, servidor fora, etc).
+export async function refreshAccessToken(
+  authUrl: string,
+  params: { clientId: string; refreshToken: string },
+  opts: ClientOpts = {},
+): Promise<RefreshTokenResponse> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: params.refreshToken,
+    client_id: params.clientId,
+  });
+  let res: Response;
+  try {
+    res = await fetchImpl(`${authUrl}/oauth/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+  } catch (cause) {
+    throw new DeviceFlowError(
+      `Não foi possível falar com o login do Guard em ${authUrl}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  if (!res.ok) {
+    let error = 'invalid_request';
+    let description: string | undefined;
+    try {
+      const parsed = (await res.json()) as { error?: string; error_description?: string };
+      error = parsed.error ?? error;
+      description = parsed.error_description;
+    } catch {
+      // mantem invalid_request
+    }
+    throw new DeviceFlowError(description ?? `Falha ao renovar o login: ${error}`, error);
+  }
+  return (await res.json()) as RefreshTokenResponse;
+}
+
+// Revoga um refresh_token (RFC 7009). Best-effort: chamado no guard_logout pra
+// derrubar a sessão no servidor também, mas nunca impede o logout local — quem
+// chama ignora o erro.
+export async function revokeToken(
+  authUrl: string,
+  params: { clientId: string; token: string },
+  opts: ClientOpts = {},
+): Promise<void> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const body = new URLSearchParams({ token: params.token, client_id: params.clientId });
+  await fetchImpl(`${authUrl}/oauth/revoke`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
 }
 
 // Lê o claim sub do JWT (sem verificar assinatura, só pra dar nome ao "Conectado

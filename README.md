@@ -127,7 +127,7 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 |---|---|
 | `guard_login` | Começa o login sem colar token, no estilo `npm login`/`gh auth login`: devolve na hora um link e um código curto pra você autorizar no navegador. Rode uma vez por máquina |
 | `guard_login_check` | Conclui o login: depois de autorizar no navegador, confirma e salva a credencial (responde "Conectado"). Se ainda não autorizou, avisa pra tentar de novo |
-| `guard_logout` | Encerra o login local (apaga a credencial em `~/.hocguard`) |
+| `guard_logout` | Encerra o login: revoga a sessão no servidor (se houver refresh_token) e apaga a credencial local em `~/.hocguard` |
 | `guard_generate_cookie_banner` | Lê o projeto Next localmente, detecta os rastreadores e devolve a conformidade de cookies: banner de consentimento (se há analytics/marketing) ou aviso informativo (se só há cookies essenciais) |
 | `guard_add_consent_point` | Acha formulários que coletam dado pessoal sem consentimento e devolve o ponto de coleta (checkbox com base legal e link de política) |
 | `guard_check_compliance` | Diagnóstico local: tracker sem consentimento, formulário sem consentimento, transferência internacional e falta de link de política, com nota 0-100 e relatório em Markdown |
