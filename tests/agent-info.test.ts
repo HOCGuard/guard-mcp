@@ -51,3 +51,8 @@ test('buildAgentName nunca passa de 80 caracteres', () => {
   const out = buildAgentName(nome, 'maquina-com-nome-tambem-gigante-so-pra-garantir');
   assert.ok(out.length <= 80, `esperava <=80, veio ${out.length}`);
 });
+
+test('buildAgentName usa o rótulo de marca quando o cliente manda slug', () => {
+  assert.equal(buildAgentName('claude-code', 'mac.local'), 'Claude Code · mac');
+  assert.equal(buildAgentName('Meu Agente', 'mac'), 'Meu Agente · mac');
+});

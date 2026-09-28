@@ -21,13 +21,14 @@ const MAX_AGENT_NAME_LEN = 80;
 // vence; a ordem só importa se um dia duas agulhas colidirem.
 const CLIENT_MATCHERS: ReadonlyArray<{ needle: string; client: AgentClient }> = [
   { needle: 'claude-code', client: 'claude-code' },
+  { needle: 'claude code', client: 'claude-code' },
   { needle: 'claude-ai', client: 'claude-desktop' },
   { needle: 'claude desktop', client: 'claude-desktop' },
   { needle: 'cursor', client: 'cursor' },
   { needle: 'visual studio code', client: 'github-copilot' },
   { needle: 'vscode', client: 'github-copilot' },
   { needle: 'windsurf', client: 'windsurf' },
-  { needle: 'gemini-cli', client: 'gemini-cli' },
+  { needle: 'gemini', client: 'gemini-cli' },
 ];
 
 export function mapAgentClient(clientInfoName: string | undefined | null): AgentClient {
@@ -40,11 +41,21 @@ function shortHostname(host: string): string {
   return host.split('.')[0] || host;
 }
 
+const ROTULO: Record<Exclude<AgentClient, 'outro'>, string> = {
+  'claude-code': 'Claude Code',
+  'claude-desktop': 'Claude Desktop',
+  cursor: 'Cursor',
+  'github-copilot': 'GitHub Copilot',
+  windsurf: 'Windsurf',
+  'gemini-cli': 'Gemini CLI',
+};
+
 // "<nome amigável do cliente MCP> · <hostname curto>", truncado a 80 chars.
-// O nome amigável é o clientInfo.name cru (ex: "Claude Code", "Cursor"), não o
-// enum mapeado por mapAgentClient: é o que o usuário reconhece na tela.
+// Cliente conhecido usa o rótulo de marca (o clientInfo.name cru costuma vir
+// como slug, ex.: "claude-code"); desconhecido usa o nome que ele mandou.
 export function buildAgentName(clientInfoName: string | undefined | null, host: string = hostname()): string {
-  const nome = (clientInfoName ?? '').trim() || 'Agente MCP';
+  const client = mapAgentClient(clientInfoName);
+  const nome = client !== 'outro' ? ROTULO[client] : (clientInfoName ?? '').trim() || 'Agente MCP';
   const full = `${nome} · ${shortHostname(host)}`;
   return full.length > MAX_AGENT_NAME_LEN ? full.slice(0, MAX_AGENT_NAME_LEN) : full;
 }

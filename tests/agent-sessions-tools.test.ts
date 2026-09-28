@@ -115,7 +115,7 @@ test('guard_login manda agent_name e agent_client mapeados do clientInfo do hand
   assert.ok(req, 'esperava POST /oauth/device/code');
   const body = req!.body as URLSearchParams;
   assert.equal(body.get('agent_client'), 'github-copilot');
-  assert.match(body.get('agent_name') ?? '', /^Visual Studio Code · /);
+  assert.match(body.get('agent_name') ?? '', /^GitHub Copilot · /);
 
   await c.close();
 });
