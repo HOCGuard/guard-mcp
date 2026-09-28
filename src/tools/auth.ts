@@ -2,6 +2,7 @@ import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { Config } from '../config.ts';
 import { DEFAULT_AUTH_URL } from '../config.ts';
+import { PURPOSES_LOGIN_SCOPE } from '../purposes-client.ts';
 import {
   resolveCredentialsPath,
   resolvePendingPath,
@@ -37,12 +38,12 @@ export function registerAuthTools(server: McpServer, config: Config): void {
     'guard_login',
     {
       description:
-        'Começa o login no HOC Guard, no estilo npm login/gh auth login. Devolve na hora um link e um código curto: mostre ao usuário, peça pra abrir o link e autorizar no navegador. Depois que ele autorizar, chame guard_login_check para concluir. Rode uma vez por máquina; depois guard_scan_site e os geradores usam o login sozinhos.',
+        'Começa o login no HOC Guard, no estilo npm login/gh auth login. Devolve na hora um link e um código curto: mostre ao usuário, peça pra abrir o link e autorizar no navegador. Depois que ele autorizar, chame guard_login_check para concluir. Rode uma vez por máquina; depois guard_scan_site, os geradores e as ferramentas de finalidades usam o login sozinhos.',
       inputSchema: z.object({
         scope: z
           .string()
-          .default('scan generate')
-          .describe('Permissões pedidas. Padrão: "scan generate".'),
+          .default(PURPOSES_LOGIN_SCOPE)
+          .describe(`Permissões pedidas. Padrão: "${PURPOSES_LOGIN_SCOPE}" (varrer, gerar e consultar/editar finalidades; o token só recebe o que o papel da conta permite).`),
       }),
       annotations: {
         title: 'Entrar no HOC Guard (passo 1)',

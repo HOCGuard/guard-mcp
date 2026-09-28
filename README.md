@@ -138,9 +138,46 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 | `guard_scan_site` | Inicia a varredura de um site publicado. Faça `guard_login` antes: a varredura usa o seu login pra provar a posse do domínio (precisa estar entre os domínios verificados da sua conta). Abre um navegador de verdade, aceita e rejeita o banner e observa o que dispara em cada caso |
 | `guard_get_scan_status` | Diz se a varredura terminou. Leva cerca de dois minutos |
 | `guard_get_scan_results` | Devolve os achados do mais grave para o menos grave, com a nota geral |
+| `guard_list_purposes` | Lista as finalidades da sua conta, com filtro por status (publicada, rascunho, proposta de agente) e base legal |
+| `guard_get_purpose` | Mostra uma finalidade legível: versão publicada, rascunho e pendências (retenção vazia, legítimo interesse sem teste) |
+| `guard_create_purpose` | Cria uma finalidade nova como rascunho, para a pessoa revisar e liberar |
+| `guard_update_purpose` | Edita uma finalidade como rascunho (cria o rascunho a partir da publicada se preciso), com resumo do que mudou |
+| `guard_cancel_purpose_draft` | Desiste de uma proposta feita pelo agente |
 
 A varredura é demorada, então o ciclo tem três passos em vez de uma chamada que expira. O resultado
 traz só o que precisa de atenção; passe `include_passed` para ver também o que está correto.
+
+## Finalidades
+
+Com login (`guard_login`), o agente consulta e propõe as finalidades de tratamento de dados da sua
+conta no Guard: para que cada dado pessoal é usado, o texto que o titular lê, a base legal, a
+retenção e o teste de legítimo interesse.
+
+**Tudo o que o agente cria ou edita é rascunho.** Nada muda para os titulares até uma pessoa abrir o
+link devolvido (`/privacidade/finalidades/<id>`), revisar e clicar em **Liberar**. O fluxo é:
+
+1. o agente lê o que já existe (`guard_list_purposes`, `guard_get_purpose`);
+2. propõe uma finalidade nova ou um ajuste (`guard_create_purpose`, `guard_update_purpose`), com um
+   resumo do que mudou e por quê;
+3. a pessoa libera, edita ou descarta na tela do Guard.
+
+| O agente pode | O agente não pode |
+|---|---|
+| Consultar finalidades e versões | Publicar (liberar) uma finalidade: o Guard recusa |
+| Criar finalidade nova como rascunho | Alterar a versão publicada: a edição sempre vira rascunho |
+| Editar o rascunho, preservando o que não mandou | Usar legítimo interesse com dado sensível |
+| Editar e cancelar a própria proposta (mesmo agente e mesma pessoa) | Mexer em rascunho aberto na tela, por outra pessoa ou por outro agente |
+| Propor em cima da versão liberada (vira um rascunho novo) | Abrir outro rascunho quando já há um rascunho de outra pessoa: ela libera ou descarta antes |
+| Consultar e propor finalidades | Chegar a qualquer outra rota do Guard: o token do agente só alcança finalidades |
+
+Regras checadas antes de enviar: legítimo interesse não vale para dado sensível (use consentimento)
+e sempre exige o teste nas três fases (interesse, necessidade, balanceamento) e como a pessoa se opõe.
+O login pede `gcc:purposes:read gcc:purposes:write` por padrão, mas o token só recebe o que o papel
+da pessoa na conta permite; sem permissão de edição, as ferramentas de escrita dizem isso.
+
+O roteiro pronto é o prompt **guard-map-purposes** (e a skill `skills/guard-map-purposes`): acha no
+código onde o app coleta dado pessoal (`guard_add_consent_point`), compara com o que já existe e
+propõe as finalidades com confirmação.
 
 ## Configuração
 
@@ -148,7 +185,7 @@ traz só o que precisa de atenção; passe `include_passed` para ver também o q
 |---|---|---|
 | `GUARD_SDK_URL` | `https://guard.hoc.app.br/sdk/banner.js` | De onde o site carrega o banner |
 | `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura |
-| `GUARD_AUTH_URL` | `https://auth.grupohoc.com.br` | Issuer do login (`guard_login`, Device Flow) |
+| `GUARD_AUTH_URL` | `https://guard.hoc.app.br` | Issuer do login (`guard_login`, Device Flow) e origem da API de finalidades |
 | `GUARD_SERVICE_TOKEN` | (nenhum) | Token de serviço pra uso interno. No dia a dia, prefira `guard_login` |
 | `GUARD_CREDENTIALS_PATH` | `<GUARD_HOME>/.hocguard/credentials.json` | Onde a credencial do login é guardada (útil em testes) |
 | `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
@@ -177,8 +214,9 @@ ferramenta. O contrato está em `src/telemetry.ts` e é recusado no servidor se 
 
 ## Skill
 
-`skills/guard-secure-ship/SKILL.md` traz o mesmo roteiro do prompt para agentes que usam skills.
-Ela é gerada de `src/workflow.ts` com `npm run gen:skill`; um teste falha se as duas divergirem.
+`skills/guard-secure-ship/SKILL.md` e `skills/guard-map-purposes/SKILL.md` trazem os mesmos roteiros
+dos prompts para agentes que usam skills. São geradas de `src/workflow.ts` com `npm run gen:skill`;
+um teste falha se divergirem.
 
 ## Desenvolvimento
 

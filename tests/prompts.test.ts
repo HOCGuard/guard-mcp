@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { createServer } from '../src/server.ts';
-import { SECURE_SHIP_STEPS } from '../src/workflow.ts';
+import { MAP_PURPOSES_STEPS, SECURE_SHIP_STEPS } from '../src/workflow.ts';
 
 async function client() {
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -28,11 +28,23 @@ test('prompt guard-secure-ship aparece e traz o roteiro com o projeto', async ()
 test('SKILL.md está em sincronia com src/workflow.ts', async () => {
   const skill = await readFile(new URL('../skills/guard-secure-ship/SKILL.md', import.meta.url), 'utf8');
   assert.ok(skill.includes(SECURE_SHIP_STEPS.trim()), 'regenere a SKILL.md a partir de src/workflow.ts');
+  const map = await readFile(new URL('../skills/guard-map-purposes/SKILL.md', import.meta.url), 'utf8');
+  assert.ok(map.includes(MAP_PURPOSES_STEPS.trim()), 'regenere a SKILL.md a partir de src/workflow.ts');
+});
+
+test('prompt guard-map-purposes aparece e usa consent point + criação de finalidade', async () => {
+  const c = await client();
+  const r = await c.getPrompt({ name: 'guard-map-purposes', arguments: { project_path: '/app' } });
+  const text = (r.messages[0]!.content as { text: string }).text;
+  assert.match(text, /guard_add_consent_point/);
+  assert.match(text, /guard_create_purpose/);
+  assert.match(text, /Liberar/);
+  assert.match(text, /Projeto: \/app/);
 });
 
 test('roteiro cita só ferramentas que existem', async () => {
   const c = await client();
   const { tools } = await c.listTools();
   const nomes = new Set(tools.map((t) => t.name));
-  for (const citada of SECURE_SHIP_STEPS.match(/guard_[a-z_]+/g) ?? []) assert.ok(nomes.has(citada), `ferramenta inexistente no roteiro: ${citada}`);
+  for (const citada of `${SECURE_SHIP_STEPS}\n${MAP_PURPOSES_STEPS}`.match(/guard_[a-z_]+/g) ?? []) assert.ok(nomes.has(citada), `ferramenta inexistente no roteiro: ${citada}`);
 });
