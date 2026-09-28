@@ -1,5 +1,9 @@
-/** Default do issuer OAuth do Guard (Device Flow, RFC 8628). */
-export const DEFAULT_AUTH_URL = 'https://auth.grupohoc.com.br';
+/**
+ * Default do issuer OAuth do Guard (Device Flow, RFC 8628). Em produção o issuer
+ * é guard.hoc.app.br (o discovery de prod anuncia esse iss, e auth.grupohoc.com.br
+ * não resolve). Sobrescreva com GUARD_AUTH_URL pra outros ambientes.
+ */
+export const DEFAULT_AUTH_URL = 'https://guard.hoc.app.br';
 
 export interface Config {
   apiUrl: string;
