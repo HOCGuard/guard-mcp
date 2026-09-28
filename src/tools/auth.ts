@@ -7,18 +7,22 @@ import {
   resolveCredentialsPath,
   resolvePendingPath,
   saveCredentials,
+  loadCredentials,
   deleteCredentials,
   savePendingLogin,
   loadPendingLogin,
   deletePendingLogin,
+  type StoredCredentials,
 } from '../credentials.ts';
 import {
   requestDeviceCode,
   pollOnce,
   decodeJwtSubject,
+  revokeToken,
   DeviceFlowError,
   GUARD_MCP_CLIENT_ID,
 } from '../auth/device-flow.ts';
+import { buildAgentName, mapAgentClient } from '../auth/agent-info.ts';
 
 function text(message: string) {
   return { content: [{ type: 'text' as const, text: message }] };
@@ -55,7 +59,15 @@ export function registerAuthTools(server: McpServer, config: Config): void {
     },
     async ({ scope }) => {
       try {
-        const device = await requestDeviceCode(authUrl, { clientId: GUARD_MCP_CLIENT_ID, scope });
+        // clientInfo do handshake `initialize`: mesmo acessor que telemetry.ts
+        // já usa pra identificar o cliente MCP (deprecated, mas funcional).
+        const clientInfoName = server.server.getClientVersion()?.name;
+        const device = await requestDeviceCode(authUrl, {
+          clientId: GUARD_MCP_CLIENT_ID,
+          scope,
+          agentName: buildAgentName(clientInfoName),
+          agentClient: mapAgentClient(clientInfoName),
+        });
         await savePendingLogin(pendingPath, {
           device_code: device.device_code,
           user_code: device.user_code,
@@ -101,11 +113,15 @@ export function registerAuthTools(server: McpServer, config: Config): void {
         const result = await pollOnce(authUrl, { clientId: GUARD_MCP_CLIENT_ID, deviceCode: pending.device_code });
         switch (result.kind) {
           case 'token': {
-            await saveCredentials(credPath, {
+            const cred: StoredCredentials = {
               access_token: result.token.access_token,
               expires_at: Date.now() + result.token.expires_in * 1000,
               scope: result.token.scope,
-            });
+            };
+            // Sessão de agente (Etapa 1): backend antigo não manda refresh_token;
+            // nesse caso a credencial fica igual à de hoje (só access_token).
+            if (result.token.refresh_token) cred.refresh_token = result.token.refresh_token;
+            await saveCredentials(credPath, cred);
             await deletePendingLogin(pendingPath);
             const sub = decodeJwtSubject(result.token.access_token);
             return text(
@@ -133,7 +149,8 @@ export function registerAuthTools(server: McpServer, config: Config): void {
   server.registerTool(
     'guard_logout',
     {
-      description: 'Encerra o login local do Guard: apaga a credencial guardada em ~/.hocguard. Depois disso, varrer volta a exigir guard_login.',
+      description:
+        'Encerra o login local do Guard: revoga a sessão de agente no servidor (se houver) e apaga a credencial guardada em ~/.hocguard. Depois disso, varrer volta a exigir guard_login.',
       inputSchema: z.object({}),
       annotations: {
         title: 'Sair do HOC Guard',
@@ -144,6 +161,12 @@ export function registerAuthTools(server: McpServer, config: Config): void {
       },
     },
     async () => {
+      const cred = await loadCredentials(credPath);
+      if (cred?.refresh_token) {
+        // Best-effort: se a revogação falhar (rede, rota ausente num servidor
+        // antigo), o logout local segue de qualquer forma.
+        await revokeToken(authUrl, { clientId: GUARD_MCP_CLIENT_ID, token: cred.refresh_token }).catch(() => {});
+      }
       const apagou = await deleteCredentials(credPath);
       await deletePendingLogin(pendingPath);
       return text(apagou ? 'Sessão encerrada. Sua credencial local foi apagada.' : 'Você não estava logado.');

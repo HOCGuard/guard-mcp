@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { Config } from '../config.ts';
+import type { TokenProvider } from '../auth/session.ts';
 import {
   PurposesClient,
   PurposesError,
@@ -246,8 +247,8 @@ export function mergeStudio(current: PurposeStudio | undefined, input: UpdateInp
   return { studio, context: next };
 }
 
-export function registerPurposeTools(server: McpServer, config: Config): void {
-  const client = new PurposesClient(config);
+export function registerPurposeTools(server: McpServer, config: Config, tokens?: TokenProvider): void {
+  const client = new PurposesClient(config, tokens);
 
   server.registerTool(
     'guard_list_purposes',

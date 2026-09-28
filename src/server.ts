@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/server';
 import { AuditorClient } from './auditor-client.ts';
+import { createTokenProvider } from './auth/session.ts';
 import { loadConfig, type Config } from './config.ts';
 import { registerScanTools } from './tools/scan.ts';
 import { registerGenerateTools } from './tools/generate.ts';
@@ -24,13 +25,17 @@ export function createServer(config: Config = loadConfig()): McpServer {
     version: SERVER_VERSION,
     homeDir: config.homeDir ?? telemetryHome(),
   });
+  // Um TokenProvider por processo, compartilhado pelos clientes HTTP que
+  // exigem login: garante que a renovação do refresh_token (rotação +
+  // concorrência) tenha um lock só, e não um por cliente.
+  const tokens = createTokenProvider(config);
   registerAuthTools(server, config);
-  registerScanTools(server, new AuditorClient(config));
+  registerScanTools(server, new AuditorClient(config, tokens));
   registerGenerateTools(server, config.sdkUrl);
   registerConsentTools(server);
   registerAdvancedTools(server, config.sdkUrl);
   registerBannerTools(server, { apiOrigin: new URL(config.sdkUrl).origin, homeDir: config.homeDir ?? telemetryHome(), version: SERVER_VERSION });
-  registerPurposeTools(server, config);
+  registerPurposeTools(server, config, tokens);
   registerPrompts(server);
   return server;
 }
