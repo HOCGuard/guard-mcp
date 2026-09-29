@@ -250,7 +250,10 @@ test('AuditorClient manda Authorization Bearer quando ha login valido', async ()
   const base = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
 
   const client = new AuditorClient({
-    apiUrl: base, tenant: 'public', requestTimeoutMs: 5000,
+    // D7: com login válido a varredura vai por padrão pelo core (authUrl), não
+    // mais direto em apiUrl — aponta os dois pro mesmo mock (ele não olha o
+    // path) pra este teste continuar focado só em "o Bearer foi mandado".
+    apiUrl: base, authUrl: base, tenant: 'public', requestTimeoutMs: 5000,
     sdkUrl: 'https://guard.test/sdk/banner.js', serviceToken: undefined, credentialsPath: credPath,
   } as any);
   await client.startScan('https://exemplo.com.br', 'lgpd');

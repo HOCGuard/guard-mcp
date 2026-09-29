@@ -1,6 +1,6 @@
 {
   "name": "@hocguard/mcp",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Servidor MCP do HOC Guard: banner de cookies, consentimento e varredura de privacidade conforme a LGPD, de dentro do seu agente de código",
   "license": "Apache-2.0",
   "type": "module",

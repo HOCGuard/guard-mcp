@@ -293,7 +293,11 @@ test('AuditorClient: 401 na API renova o token uma vez e repete a chamada com su
     if (c.url === '/oauth/token') {
       return { status: 200, body: { access_token: 'renovado', token_type: 'Bearer', expires_in: 3600, scope: 'scan', refresh_token: 'rt-2' } };
     }
-    if (c.url === '/audit') {
+    // Contrato Agentes de IA (Etapas 2-4), D7: logado (bearer), a varredura vai
+    // por padrão pelo core (${authUrl}/api/v1/consent/audit), não mais direto
+    // em /audit — aqui authUrl e apiUrl são o mesmo mock, então os dois caminhos
+    // caem no mesmo servidor.
+    if (c.url === '/audit' || c.url === '/api/v1/consent/audit') {
       auditCalls++;
       if (c.auth === 'Bearer expirado-no-servidor') return { status: 401, body: { detail: 'jwt expired' } };
       if (c.auth === 'Bearer renovado') return { status: 202, body: { job_id: 'j1' } };

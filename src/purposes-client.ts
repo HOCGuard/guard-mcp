@@ -219,18 +219,35 @@ function missingScopeMessage(scope: string): string {
 // Erros RFC 7807 com type = urn:hoc:error:<...>:<code>. `code` fica só com o
 // último segmento (ex: purpose-has-other-draft) para as ferramentas compararem.
 function httpError(status: number, body: string, scope: string): PurposesError {
-  let parsed: { type?: string; code?: string; error?: string; detail?: string; message?: string; title?: string } = {};
+  let parsed: { type?: string; code?: string; error?: string; detail?: string; message?: string; title?: string; motivo?: string } = {};
   try {
     parsed = JSON.parse(body) as typeof parsed;
   } catch {
     // corpo não JSON: fica só o status
   }
+
+  // Contrato Agentes de IA (Etapas 2-4), D2/4.2: portão de guardrails do core
+  // (tenant-auth), antes até do gcc ver a requisição. Mesmo corpo para bloqueio
+  // reversível (403: fora do horário, área sem acesso, cliente não permitido...)
+  // e limite diário estourado (429): "detail" já é o texto de negócio em PT-BR
+  // (motivos.ts) pronto para o agente repassar; "motivo" é o código estável.
+  // Sem retry (só há retry em 401, ver request()).
+  if (parsed.type === 'urn:hoc:error:agent:blocked') {
+    return new PurposesError(parsed.detail ?? 'O Guard bloqueou esta ação para agentes de IA.', status, parsed.motivo);
+  }
+
   const raw = [parsed.type, parsed.code, parsed.error].find((v) => typeof v === 'string' && v.includes(':')) ?? parsed.code ?? parsed.type;
   const code = raw?.split(':').pop();
   const detail = parsed.detail ?? parsed.message ?? parsed.title ?? (parsed.error && !parsed.error.includes(':') ? parsed.error : undefined);
 
   if (status === 401) {
     return new PurposesError(`Seu login do Guard expirou ou foi revogado. ${loginHint()}`, status, code);
+  }
+  // gcc, fail-closed (D4): sem o header de política que o proxy do core injeta,
+  // não há como saber se o agente pode propor. Transitório: normalmente some no
+  // próximo request.
+  if (status === 503 && code === 'agent-policy-unavailable') {
+    return new PurposesError('O Guard não conseguiu confirmar a política de agentes da empresa agora. Tente de novo em instantes.', status, code);
   }
   if (code === 'oauth-client-route-not-allowed' || code === 'agent-route-not-allowed') {
     return new PurposesError(

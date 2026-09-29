@@ -184,8 +184,9 @@ propõe as finalidades com confirmação.
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `GUARD_SDK_URL` | `https://guard.hoc.app.br/sdk/banner.js` | De onde o site carrega o banner |
-| `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura |
+| `GUARD_API_URL` | `http://localhost:3085` | Onde está o serviço de varredura, para o caminho com `GUARD_SERVICE_TOKEN` (uso interno, sem login) |
 | `GUARD_AUTH_URL` | `https://guard.hoc.app.br` | Issuer do login (`guard_login`, Device Flow) e origem da API de finalidades |
+| `GUARD_SCAN_VIA_CORE` | `true` | Logado por `guard_login`, a varredura passa pelo Guard (`GUARD_AUTH_URL`) em vez de ir direto no `GUARD_API_URL`, para que a política de agentes de IA da empresa (limites, horário, áreas liberadas) valha também na varredura |
 | `GUARD_SERVICE_TOKEN` | (nenhum) | Token de serviço pra uso interno. No dia a dia, prefira `guard_login` |
 | `GUARD_CREDENTIALS_PATH` | `<GUARD_HOME>/.hocguard/credentials.json` | Onde a credencial do login é guardada (útil em testes) |
 | `GUARD_TENANT` | `public` | Identificação da conta, quando houver |
