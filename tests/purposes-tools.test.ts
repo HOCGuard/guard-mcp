@@ -477,7 +477,7 @@ test('rota fora do alcance do agente (403 agent-route-not-allowed / oauth-client
     rotas = () => ({ status: 403, body: { type } });
     const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
     assert.ok(isError(r));
-    assert.match(texto(r), /não libera essa ação para agentes/);
+    assert.match(texto(r), /não libera essa ação para conexões MCP/);
     assert.doesNotMatch(texto(r), /papel/);
   }
   await c.close();

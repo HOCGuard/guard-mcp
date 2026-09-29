@@ -137,7 +137,7 @@ function errorFrom(status: number, body: string, hadBearer: boolean): AuditorErr
   // (429): "detail" já é o texto de negócio em PT-BR (motivos.ts) pronto para
   // o agente repassar ao modelo; "motivo" é o código estável.
   if (parsed?.type === 'urn:hoc:error:agent:blocked') {
-    return new AuditorError(parsed.detail ?? 'O Guard bloqueou esta varredura para agentes de IA.', status, parsed.motivo);
+    return new AuditorError(parsed.detail ?? 'O Guard bloqueou esta varredura para conexões MCP.', status, parsed.motivo);
   }
   // Login expirado/invalido no meio do caminho: mensagem acionavel.
   if (hadBearer && (status === 401 || status === 403)) {
