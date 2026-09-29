@@ -233,7 +233,7 @@ function httpError(status: number, body: string, scope: string): PurposesError {
   // (motivos.ts) pronto para o agente repassar; "motivo" é o código estável.
   // Sem retry (só há retry em 401, ver request()).
   if (parsed.type === 'urn:hoc:error:agent:blocked') {
-    return new PurposesError(parsed.detail ?? 'O Guard bloqueou esta ação para agentes de IA.', status, parsed.motivo);
+    return new PurposesError(parsed.detail ?? 'O Guard bloqueou esta ação para conexões MCP.', status, parsed.motivo);
   }
 
   const raw = [parsed.type, parsed.code, parsed.error].find((v) => typeof v === 'string' && v.includes(':')) ?? parsed.code ?? parsed.type;
@@ -247,11 +247,11 @@ function httpError(status: number, body: string, scope: string): PurposesError {
   // não há como saber se o agente pode propor. Transitório: normalmente some no
   // próximo request.
   if (status === 503 && code === 'agent-policy-unavailable') {
-    return new PurposesError('O Guard não conseguiu confirmar a política de agentes da empresa agora. Tente de novo em instantes.', status, code);
+    return new PurposesError('O Guard não conseguiu confirmar a política de conexões MCP da empresa agora. Tente de novo em instantes.', status, code);
   }
   if (code === 'oauth-client-route-not-allowed' || code === 'agent-route-not-allowed') {
     return new PurposesError(
-      'O Guard não libera essa ação para agentes de IA: pelo MCP só dá para consultar finalidades e propor rascunhos. Peça para a pessoa fazer isso na tela do Guard.',
+      'O Guard não libera essa ação para conexões MCP: só dá para consultar finalidades e propor rascunhos. Peça para a pessoa fazer isso na tela do Guard.',
       status,
       code,
     );
