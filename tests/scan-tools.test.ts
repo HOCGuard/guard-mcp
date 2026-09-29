@@ -1,6 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer as createHttpServer, type Server } from 'node:http';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { createServer } from '../src/server.ts';
@@ -12,6 +15,17 @@ let http: Server;
 let baseUrl: string;
 let pollsAntesDeTerminar = 2;
 let ultimoServiceToken: string | null | undefined;
+// Isola de ~/.hocguard: sem isso, um guard_login de verdade na máquina de quem
+// roda os testes faria o D7 (varredura via core, contrato Agentes de IA)
+// desviar essas chamadas para o authUrl de produção em vez do mock local.
+let credDir: string;
+let credPath: string;
+
+before(async () => {
+  credDir = await mkdtemp(join(tmpdir(), 'hocguard-scan-'));
+  credPath = join(credDir, 'credentials.json');
+});
+after(() => rm(credDir, { recursive: true, force: true }));
 
 before(async () => {
   http = createHttpServer((req, res) => {
@@ -57,10 +71,14 @@ before(async () => {
 
 after(() => http.close());
 
-async function client(apiUrl = baseUrl, serviceToken: string | undefined = undefined) {
+async function client(apiUrl = baseUrl, serviceToken: string | undefined = undefined, extra: Record<string, unknown> = {}) {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const c = new Client({ name: 'test', version: '0.0.0' });
-  const server = createServer({ apiUrl, tenant: 'public', requestTimeoutMs: 5000, sdkUrl: 'https://guard.test/sdk/banner.js', serviceToken });
+  const server = createServer({
+    apiUrl, tenant: 'public', requestTimeoutMs: 5000, sdkUrl: 'https://guard.test/sdk/banner.js', serviceToken,
+    credentialsPath: credPath, // não logado por padrão: currentToken() => null
+    ...extra,
+  });
   await Promise.all([server.connect(b), c.connect(a)]);
   return c;
 }
@@ -132,5 +150,84 @@ test('serviço fora do ar vira erro legível, não exceção', async () => {
   assert.equal((result as { isError?: boolean }).isError, true);
   const texto = (result as { content: { text: string }[] }).content[0]!.text;
   assert.match(texto, /não foi possível falar com o serviço de varredura/i);
+  await c.close();
+});
+
+// --- Contrato Agentes de IA (Etapas 2-4), D7/4.9, seção 9: com login por --
+// device flow, a varredura passa pelo core em vez de ir direto no consent-
+// auditor, para a política/limites da empresa valerem também aqui.
+
+test('logado (guard_login): guard_scan_site vai pelo core (authUrl + /api/v1/consent), não em GUARD_API_URL', async () => {
+  let chamouCore = false;
+  const core = createHttpServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    if (req.method === 'POST' && req.url === '/api/v1/consent/audit') {
+      chamouCore = true;
+      assert.equal(req.headers['authorization'], 'Bearer jwt-do-usuario');
+      res.writeHead(202);
+      res.end(JSON.stringify({ job_id: 'via-core-1', status: 'queued' }));
+      return;
+    }
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: 'rota não mockada no core' }));
+  });
+  await new Promise<void>((r) => core.listen(0, '127.0.0.1', r));
+  const addr = core.address();
+  const coreUrl = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+
+  const credLogado = join(credDir, 'logado-1.json');
+  await writeFile(credLogado, JSON.stringify({ access_token: 'jwt-do-usuario', expires_at: Date.now() + 3_600_000, scope: 'scan' }));
+
+  // apiUrl continua em porta morta: se a chamada cair lá, o teste falha (via `not ok`/timeout),
+  // provando que quem decide o destino é o login, não GUARD_API_URL.
+  const c = await client('http://127.0.0.1:1', undefined, { authUrl: coreUrl, credentialsPath: credLogado });
+  const started = payload(await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } }));
+  assert.equal(started['scan_id'], 'via-core-1');
+  assert.equal(chamouCore, true);
+
+  await c.close();
+  core.close();
+});
+
+test('bloqueio do portão de agentes (403 urn:hoc:error:agent:blocked) vira mensagem de negócio pro modelo, sem retry', async () => {
+  let chamadas = 0;
+  const core = createHttpServer((req, res) => {
+    chamadas++;
+    res.setHeader('content-type', 'application/problem+json');
+    res.writeHead(403);
+    res.end(JSON.stringify({
+      type: 'urn:hoc:error:agent:blocked',
+      title: 'Agente bloqueado pela política da empresa',
+      status: 403,
+      detail: 'Fora do horário permitido (08:00 às 19:00, horário de Brasília).',
+      motivo: 'fora-do-horario',
+    }));
+  });
+  await new Promise<void>((r) => core.listen(0, '127.0.0.1', r));
+  const addr = core.address();
+  const coreUrl = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+
+  const credLogado = join(credDir, 'logado-2.json');
+  await writeFile(credLogado, JSON.stringify({ access_token: 'jwt-do-usuario', expires_at: Date.now() + 3_600_000, scope: 'scan' }));
+
+  const c = await client('http://127.0.0.1:1', undefined, { authUrl: coreUrl, credentialsPath: credLogado });
+  const result = await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } });
+  assert.equal((result as { isError?: boolean }).isError, true);
+  const texto = (result as { content: { text: string }[] }).content[0]!.text;
+  assert.equal(texto, 'Fora do horário permitido (08:00 às 19:00, horário de Brasília).');
+  assert.equal(chamadas, 1); // sem retry em 403
+
+  await c.close();
+  core.close();
+});
+
+test('GUARD_SCAN_VIA_CORE=false: logado, mas a varredura continua indo direto em GUARD_API_URL', async () => {
+  const credLogado = join(credDir, 'logado-3.json');
+  await writeFile(credLogado, JSON.stringify({ access_token: 'jwt-do-usuario', expires_at: Date.now() + 3_600_000, scope: 'scan' }));
+
+  const c = await client(baseUrl, undefined, { authUrl: 'http://127.0.0.1:1', credentialsPath: credLogado, scanViaCore: false });
+  const started = payload(await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } }));
+  assert.equal(started['scan_id'], '01JQ'); // veio do mock local (baseUrl), não da porta morta
+
   await c.close();
 });

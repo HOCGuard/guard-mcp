@@ -29,6 +29,14 @@ export interface Config {
   telemetryUrl?: string | undefined;
   /** Onde fica ~/.hocguard. Padrão: GUARD_HOME ou a home do usuário. */
   homeDir?: string | undefined;
+  /**
+   * Contrato Agentes de IA (Etapas 2-4), D7: com login por device flow, a
+   * varredura passa pelo core (${authUrl}/api/v1/consent) em vez de ir direto
+   * ao consent-auditor — assim sessão, política e limites da empresa valem
+   * também pra varredura. Default true. O caminho com X-Service-Token (uso
+   * interno, sem login) nunca muda: continua direto em GUARD_API_URL.
+   */
+  scanViaCore?: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -43,5 +51,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     telemetry: env['GUARD_TELEMETRY'] === '1' || env['GUARD_TELEMETRY'] === 'true',
     telemetryUrl: env['GUARD_TELEMETRY_URL'],
     homeDir: env['GUARD_HOME'],
+    scanViaCore: env['GUARD_SCAN_VIA_CORE'] === undefined ? true : env['GUARD_SCAN_VIA_CORE'] !== '0' && env['GUARD_SCAN_VIA_CORE'] !== 'false',
   };
 }

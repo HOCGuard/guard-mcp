@@ -483,6 +483,49 @@ test('rota fora do alcance do agente (403 agent-route-not-allowed / oauth-client
   await c.close();
 });
 
+test('contrato Agentes de IA: 403 urn:hoc:error:agent:blocked vira o detail de negócio, sem retry', async () => {
+  const c = await client();
+  let chamadas = 0;
+  rotas = () => {
+    chamadas++;
+    return {
+      status: 403,
+      body: { type: 'urn:hoc:error:agent:blocked', title: 'Agente bloqueado', status: 403, detail: 'A empresa não liberou finalidades para agentes de IA.', motivo: 'area-sem-acesso' },
+    };
+  };
+  const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
+  assert.ok(isError(r));
+  assert.equal(texto(r), 'A empresa não liberou finalidades para agentes de IA.');
+  assert.equal(chamadas, 1);
+  await c.close();
+});
+
+test('contrato Agentes de IA: 429 urn:hoc:error:agent:blocked (limite diário) vira o detail, sem retry', async () => {
+  const c = await client();
+  let chamadas = 0;
+  rotas = () => {
+    chamadas++;
+    return {
+      status: 429,
+      body: { type: 'urn:hoc:error:agent:blocked', title: 'Agente bloqueado', status: 429, detail: 'Agente de IA (HOC Guard MCP) chegou ao limite de 20 propostas hoje.', motivo: 'limite-propostas' },
+    };
+  };
+  const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
+  assert.ok(isError(r));
+  assert.equal(texto(r), 'Agente de IA (HOC Guard MCP) chegou ao limite de 20 propostas hoje.');
+  assert.equal(chamadas, 1);
+  await c.close();
+});
+
+test('contrato Agentes de IA: 503 agent-policy-unavailable (gcc sem o header de política) vira mensagem clara', async () => {
+  const c = await client();
+  rotas = () => ({ status: 503, body: { type: 'urn:hoc:error:gcc:agent-policy-unavailable' } });
+  const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
+  assert.ok(isError(r));
+  assert.match(texto(r), /não conseguiu confirmar a política/);
+  await c.close();
+});
+
 test('nenhuma ferramenta de finalidade chama /publish', () => {
   // node:test roda os testes de um arquivo em sequência: este vem por último.
   assert.ok(historico.length > 10);
