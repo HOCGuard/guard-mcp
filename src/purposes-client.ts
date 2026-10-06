@@ -9,7 +9,8 @@ import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 
 export const PURPOSES_READ_SCOPE = 'gcc:purposes:read';
 export const PURPOSES_WRITE_SCOPE = 'gcc:purposes:write';
-export const PURPOSES_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE}`;
+// Documentos jurídicos (gcc:policy:*) entram no padrão: rascunho de política e termos (Hguard-2015).
+export const PURPOSES_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE} gcc:policy:read gcc:policy:write`;
 
 export type LegalBasis = 'consent' | 'legitimate_interest' | 'contract' | 'legal_obligation';
 
