@@ -10,7 +10,7 @@ export const SECURE_SHIP_STEPS = `Você vai deixar este projeto em conformidade 
 
 3. Aplicação. Com a confirmação, aplique as mudanças de banner.changes e consent_points.changes. Arquivos com action "create" são novos; com action "edit", insira o trecho no ponto indicado pela nota, sem apagar o que já existe. Se banner.mode for "already-installed", não mexa no banner.
 
-4. Política. Salve policy.policy_markdown como rascunho (por exemplo docs/politica-de-privacidade.md). Não publique: avise que é rascunho e precisa de revisão jurídica, e liste os campos entre colchetes que faltam preencher.
+4. Política. Com login no Guard, grave o texto como rascunho no editor do Guard com guard_write_document_draft (tipo privacy); sem login, salve policy.policy_markdown como rascunho (por exemplo docs/politica-de-privacidade.md). Não publique: avise que é rascunho e precisa de revisão jurídica, e repasse os avisos (warnings) com o que falta informar.
 
 5. Verificação. Rode o build do projeto. Depois chame guard_check_compliance de novo e mostre a nota nova. Deixe claro que é uma análise estática do código: para confirmar o site no ar, o usuário deve rodar guard_scan_site na URL publicada.
 

@@ -5,7 +5,10 @@ import type { SourceFile } from './trackers.ts';
 const SOURCE_EXT = /\.(t|j)sx?$|\.html?$|\.mdx?$|\.vue$|\.svelte$|\.astro$/;
 // Arquivos de manifesto/config que ajudam a detectar framework e dependências.
 const EXTRA_FILES = /(^|\/)(package\.json|next\.config\.[mc]?[jt]s|vite\.config\.[mc]?[jt]s|astro\.config\.[mc]?[jt]s)$/;
-const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'out', 'coverage', '.turbo', '.vercel']);
+const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'out', 'coverage', '.turbo', '.vercel',
+  // Exemplo e teste não são o que o app faz: citar RD Station numa story não é usar RD Station (Hguard-2015).
+  'tests', 'test', '__tests__', '__mocks__', 'fixtures', '__fixtures__', 'testing', 'e2e', 'stories', '.storybook', 'storybook-static']);
+const SKIP_FILE = /(\.(test|spec|stories|story|fixtures?|mocks?)|^(fixtures?|mocks?|demo))\.[cm]?[jt]sx?$/i;
 // Diretórios que quase sempre têm o que interessa. Visitados primeiro para não
 // perder o essencial quando o teto é atingido em monorepo grande (cenário 5).
 const PRIORITY = ['app', 'src', 'pages', 'components'];
@@ -37,7 +40,7 @@ export async function collect(root: string): Promise<Collected> {
         if (!SKIP_DIRS.has(entry.name)) await walk(full);
       } else {
         const rel = relative(root, full).replace(/\\/g, '/');
-        if (SOURCE_EXT.test(entry.name) || EXTRA_FILES.test(rel)) {
+        if ((SOURCE_EXT.test(entry.name) && !SKIP_FILE.test(entry.name)) || EXTRA_FILES.test(rel)) {
           files.push({ path: rel, content: await readFile(full, 'utf8') });
         }
       }

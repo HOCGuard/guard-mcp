@@ -91,7 +91,7 @@ function payload(result: unknown) {
 test('expõe exatamente as ferramentas de varredura e de geração', async () => {
   const c = await client();
   const { tools } = await c.listTools();
-  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_add_consent_point', 'guard_cancel_purpose_draft', 'guard_check_compliance', 'guard_create_banner', 'guard_create_purpose', 'guard_explain', 'guard_generate_cookie_banner', 'guard_generate_policy', 'guard_get_purpose', 'guard_get_scan_results', 'guard_get_scan_status', 'guard_list_purposes', 'guard_login', 'guard_login_check', 'guard_logout', 'guard_make_compliant', 'guard_scan_site', 'guard_update_purpose']);
+  assert.deepEqual(tools.map(t => t.name).sort(), ['guard_add_consent_point', 'guard_cancel_purpose_draft', 'guard_check_compliance', 'guard_check_document', 'guard_create_banner', 'guard_create_purpose', 'guard_explain', 'guard_generate_cookie_banner', 'guard_generate_policy', 'guard_get_document', 'guard_get_purpose', 'guard_get_scan_results', 'guard_get_scan_status', 'guard_list_documents', 'guard_list_purposes', 'guard_login', 'guard_login_check', 'guard_logout', 'guard_make_compliant', 'guard_scan_site', 'guard_update_purpose', 'guard_write_document_draft']);
   await c.close();
 });
 
@@ -101,8 +101,9 @@ test('toda ferramenta declara as anotações que o cliente usa para decidir apro
   // Quem escreve algo (servidor ou disco) tem que dizer, para o cliente pedir aprovação.
   // guard_login* e guard_logout gravam/apagam estado local em ~/.hocguard.
   // As de finalidade gravam rascunho na conta; só o cancelamento apaga.
-  const escrevem = new Set(['guard_create_banner', 'guard_login', 'guard_login_check', 'guard_logout', 'guard_create_purpose', 'guard_update_purpose', 'guard_cancel_purpose_draft']);
-  const apagam = new Set(['guard_cancel_purpose_draft']);
+  // Escrever rascunho de documento substitui o texto do rascunho: conta como apagar.
+  const escrevem = new Set(['guard_create_banner', 'guard_login', 'guard_login_check', 'guard_logout', 'guard_create_purpose', 'guard_update_purpose', 'guard_cancel_purpose_draft', 'guard_write_document_draft']);
+  const apagam = new Set(['guard_cancel_purpose_draft', 'guard_write_document_draft']);
   for (const tool of tools) {
     assert.equal(tool.annotations?.readOnlyHint, !escrevem.has(tool.name), `${tool.name} com readOnlyHint errado`);
     assert.equal(tool.annotations?.destructiveHint, apagam.has(tool.name), `${tool.name} com destructiveHint errado`);

@@ -47,7 +47,7 @@ export function registerAuthTools(server: McpServer, config: Config): void {
         scope: z
           .string()
           .default(PURPOSES_LOGIN_SCOPE)
-          .describe(`Permissões pedidas. Padrão: "${PURPOSES_LOGIN_SCOPE}" (varrer, gerar e consultar/editar finalidades; o token só recebe o que o papel da conta permite).`),
+          .describe(`Permissões pedidas. Padrão: "${PURPOSES_LOGIN_SCOPE}" (varrer, gerar, consultar/editar finalidades e escrever rascunhos de documentos; o token só recebe o que o papel da conta permite).`),
       }),
       annotations: {
         title: 'Entrar no HOC Guard (passo 1)',

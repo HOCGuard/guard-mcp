@@ -12,6 +12,7 @@ import { registerPrompts } from './tools/prompts.ts';
 import { registerBannerTools } from './tools/banner.ts';
 import { registerAuthTools } from './tools/auth.ts';
 import { registerPurposeTools } from './tools/purposes.ts';
+import { registerDocumentTools } from './tools/documents.ts';
 
 export const SERVER_NAME = 'hoc-guard';
 // src/ e dist/ ficam um nível abaixo da raiz do pacote.
@@ -36,6 +37,7 @@ export function createServer(config: Config = loadConfig()): McpServer {
   registerAdvancedTools(server, config.sdkUrl);
   registerBannerTools(server, { apiOrigin: new URL(config.sdkUrl).origin, homeDir: config.homeDir ?? telemetryHome(), version: SERVER_VERSION });
   registerPurposeTools(server, config, tokens);
+  registerDocumentTools(server, config, tokens);
   registerPrompts(server);
   return server;
 }

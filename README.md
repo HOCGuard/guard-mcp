@@ -143,9 +143,30 @@ Verifique se o banner do meu site realmente bloqueia os rastreadores.
 | `guard_create_purpose` | Cria uma finalidade nova como rascunho, para a pessoa revisar e liberar |
 | `guard_update_purpose` | Edita uma finalidade como rascunho (cria o rascunho a partir da publicada se preciso), com resumo do que mudou |
 | `guard_cancel_purpose_draft` | Desiste de uma proposta feita pelo agente |
+| `guard_list_documents` | Lista os documentos jurídicos da conta (política de privacidade, termos, cookies, livres) com a situação de cada um |
+| `guard_get_document` | Lê um documento: seções, revisão atual e os dados da empresa que entram no texto como `{{chave}}` |
+| `guard_write_document_draft` | Escreve o rascunho de um documento no editor do Guard a partir de Markdown (cria ou substitui o texto do rascunho). Não publica |
+| `guard_check_document` | Diz o que ainda falta para publicar (o mesmo checklist da tela) |
 
 A varredura é demorada, então o ciclo tem três passos em vez de uma chamada que expira. O resultado
 traz só o que precisa de atenção; passe `include_passed` para ver também o que está correto.
+
+## Documentos jurídicos
+
+Com login, o agente escreve o **rascunho** da política de privacidade, dos termos de uso ou de um
+documento livre direto no editor do Guard. A versão no ar não muda: a pessoa abre o link devolvido
+(`/privacidade/documentos/<id>`), revisa e clica em **Publicar**.
+
+1. `guard_list_documents` e `guard_get_document`: o que já existe, a revisão atual e os dados da
+   empresa disponíveis (`{{empresa}}`, `{{email_dpo}}`...);
+2. `guard_write_document_draft`: o texto em Markdown (`## Seção`, listas, **negrito**, links). Dado da
+   empresa entra como `{{chave}}` e vira o dado do documento, com o valor de hoje;
+3. `guard_check_document`: o que falta para publicar; a pessoa publica na tela.
+
+Lacuna entre colchetes (`[CNPJ da empresa]`) é recusada antes de gravar: o Guard não publica com ela.
+Para atualizar um documento existente o agente manda a revisão que leu; se alguém mudou o texto
+depois, o Guard recusa e o agente lê de novo. Publicar, desfazer, centrais, acesso e o canal de
+direitos ficam na tela.
 
 ## Finalidades
 
@@ -168,11 +189,11 @@ link devolvido (`/privacidade/finalidades/<id>`), revisar e clicar em **Liberar*
 | Editar o rascunho, preservando o que não mandou | Usar legítimo interesse com dado sensível |
 | Editar e cancelar a própria proposta (mesmo agente e mesma pessoa) | Mexer em rascunho aberto na tela, por outra pessoa ou por outro agente |
 | Propor em cima da versão liberada (vira um rascunho novo) | Abrir outro rascunho quando já há um rascunho de outra pessoa: ela libera ou descarta antes |
-| Consultar e propor finalidades | Chegar a qualquer outra rota do Guard: o token do agente só alcança finalidades |
+| Consultar e propor finalidades e rascunhos de documentos | Chegar a qualquer outra rota do Guard: o token do agente só alcança finalidades e rascunhos de documentos |
 
 Regras checadas antes de enviar: legítimo interesse não vale para dado sensível (use consentimento)
 e sempre exige o teste nas três fases (interesse, necessidade, balanceamento) e como a pessoa se opõe.
-O login pede `gcc:purposes:read gcc:purposes:write` por padrão, mas o token só recebe o que o papel
+O login pede `gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write` por padrão, mas o token só recebe o que o papel
 da pessoa na conta permite; sem permissão de edição, as ferramentas de escrita dizem isso.
 
 O roteiro pronto é o prompt **guard-map-purposes** (e a skill `skills/guard-map-purposes`): acha no
