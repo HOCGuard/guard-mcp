@@ -1,6 +1,6 @@
 {
   "name": "@hocguard/mcp",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Servidor MCP do HOC Guard: banner de cookies, consentimento e varredura de privacidade conforme a LGPD, de dentro do seu agente de código",
   "license": "Apache-2.0",
   "type": "module",
@@ -45,11 +45,11 @@
   },
   "dependencies": {
     "@babel/parser": "^7.29.9",
-    "@modelcontextprotocol/server": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.1.0",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^24.0.0",
     "typescript": "^5.7.0"
   },
