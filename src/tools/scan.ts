@@ -84,7 +84,7 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
     'guard_get_scan_results',
     {
       description:
-        'Devolve os achados de uma varredura concluída, do mais grave para o menos grave, com nota geral. Traz só o que precisa de atenção; passe include_passed para ver também o que está correto.',
+        'Devolve os achados de uma varredura concluída, do mais grave para o menos grave. Leia verdict antes da nota: confirmado é resultado medido; preliminar tem item importante não confirmado (nota provisória); nao_vimos_o_site não tem nota e não atesta nada. Repasse verdict_note ao usuário. Traz só o que precisa de atenção; passe include_passed para ver também o que está correto.',
       inputSchema: z.object({
         scan_id: z.string().min(1),
         include_passed: z.boolean().default(false),
