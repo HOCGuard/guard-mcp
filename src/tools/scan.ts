@@ -2,6 +2,7 @@ import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { AuditorClient, AuditorError } from '../auditor-client.ts';
 import { summarize } from '../findings.ts';
+import { explainFailure, failureMessage } from '../scan-failure.ts';
 
 const FRAMEWORKS = ['lgpd', 'gdpr', 'ccpa', 'all'] as const;
 
@@ -50,7 +51,7 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
     'guard_get_scan_status',
     {
       description:
-        'Informa em que pé está uma varredura iniciada por guard_scan_site. Responde queued, running, completed ou failed. Espere alguns segundos entre consultas.',
+        'Informa em que pé está uma varredura iniciada por guard_scan_site. Responde queued, running, retrying, completed ou failed. Em failed traz o motivo e o próximo passo: não chame guard_get_scan_results nem repita a consulta. Espere alguns segundos entre consultas.',
       inputSchema: z.object({ scan_id: z.string().min(1) }),
       annotations: {
         title: 'Status da varredura',
@@ -63,12 +64,16 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
     async ({ scan_id }) => {
       try {
         const status = await client.getStatus(scan_id);
-        return text({
+        const base = {
           scan_id: status.job_id,
           status: status.status,
           elapsed_seconds: status.elapsed_ms ? Math.round(status.elapsed_ms / 1000) : undefined,
           ready: status.status === 'completed',
-        });
+        };
+        if (status.status !== 'failed') return text(base);
+        // Hguard-2578: sem o motivo o agente ficava consultando em loop.
+        const e = explainFailure(status.failure);
+        return text({ ...base, reason: e.reason, motivo: e.motivo, next: e.next, retry_helps: e.retry });
       } catch (error) {
         return failure(error);
       }
@@ -99,6 +104,9 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
         return text(summarize(report, { includePassed: include_passed, limit }));
       } catch (error) {
         if (error instanceof AuditorError && error.status === 409) {
+          // 409 também vem quando o job falhou: conferir antes de mandar esperar.
+          const status = await client.getStatus(scan_id).catch(() => undefined);
+          if (status?.status === 'failed') return failure(new AuditorError(failureMessage(scan_id, status.failure)));
           return failure(
             new AuditorError('A varredura ainda não terminou. Consulte guard_get_scan_status e tente de novo quando estiver completed.'),
           );

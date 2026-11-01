@@ -2,6 +2,7 @@ import type { Config } from './config.ts';
 import { DEFAULT_AUTH_URL } from './config.ts';
 import type { RawReport } from './findings.ts';
 import { createTokenProvider, type TokenProvider } from './auth/session.ts';
+import type { ScanFailure } from './scan-failure.ts';
 
 export interface StartedScan {
   job_id: string;
@@ -12,6 +13,8 @@ export interface ScanStatus {
   job_id: string;
   status: string;
   elapsed_ms?: number;
+  /** Hguard-2578: só em status failed. */
+  failure?: ScanFailure;
 }
 
 export class AuditorError extends Error {
