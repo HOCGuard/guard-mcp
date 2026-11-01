@@ -117,7 +117,7 @@ function rascunhoDaTela(id: string) {
 const LI_OK = {
   title: 'Prevenção a fraude', description: 'Detectar fraude no checkout', consent_text: 'Usamos seus dados para evitar fraude',
   legal_basis: 'legitimate_interest', lia_interest: 'Evitar fraude', lia_necessity: 'Sem meio menos invasivo',
-  lia_balance: 'Expectativa razoável', lia_opt_out: 'E-mail para dpo@x', lia_conclusion: 'favoravel',
+  lia_balance: 'Expectativa razoável', lia_safeguards: 'Oposição por e-mail para dpo@x', lia_opt_out: true, lia_conclusion: 'favoravel',
 };
 
 // --- validação local ---------------------------------------------------------
@@ -132,22 +132,25 @@ test('validação local: LI exige as 3 fases e opt-out; desfavorável recusa; co
   const p = validatePurposeRules({ basis: 'legitimate_interest', sensitive: false, lia: { interest: 'x' } });
   assert.match(p.join(' '), /lia_necessity/);
   assert.match(p.join(' '), /lia_balance/);
-  assert.match(p.join(' '), /lia_opt_out/);
   assert.doesNotMatch(p.join(' '), /lia_interest \(/);
-  const d = validatePurposeRules({ basis: 'legitimate_interest', sensitive: false, lia: { interest: 'a', necessity: 'b', balance: 'c', opt_out: 'd', conclusion: 'desfavoravel' } });
+  // Hguard-2345: opt_out ausente vale true no gcc; só false é problema.
+  assert.doesNotMatch(p.join(' '), /lia_opt_out/);
+  const semOposicao = validatePurposeRules({ basis: 'legitimate_interest', sensitive: false, lia: { interest: 'a', necessity: 'b', balance: 'c', opt_out: false } });
+  assert.match(semOposicao.join(' '), /lia_opt_out true/);
+  const d = validatePurposeRules({ basis: 'legitimate_interest', sensitive: false, lia: { interest: 'a', necessity: 'b', balance: 'c', opt_out: true, conclusion: 'desfavoravel' } });
   assert.match(d.join(' '), /desfavorável/);
   assert.deepEqual(validatePurposeRules({ basis: 'consent', sensitive: true, lia: undefined }), []);
 });
 
 test('mergeStudio preserva contextos, pontos e campos que o agente não mandou', () => {
-  const { studio, context } = mergeStudio(structuredClone(STUDIO), { law: 'eu', rationale: 'nova', lia_opt_out: 'link' });
+  const { studio, context } = mergeStudio(structuredClone(STUDIO), { law: 'eu', rationale: 'nova', lia_opt_out: true });
   assert.equal(studio['extra_do_studio'], 'manter');
   assert.equal(studio.title, 'Newsletter');
   assert.equal(studio.contexts!.length, 2);
   assert.deepEqual(studio.contexts![0], STUDIO.contexts[0]);
   assert.equal(context!.rationale, 'nova');
   assert.deepEqual(context!.points, ['form-eu']);
-  assert.equal(context!.lia!.opt_out, 'link');
+  assert.equal(context!.lia!.opt_out, true);
 });
 
 // --- sem login / permissão -----------------------------------------------------
@@ -249,7 +252,8 @@ test('guard_get_purpose junta publicada e rascunho e aponta pendências', async 
   const pend = r.pendencias.join(' | ');
   assert.match(pend, /Retenção não definida/);
   assert.match(pend, /Justificativa/);
-  assert.match(pend, /lia_opt_out/);
+  assert.match(pend, /lia_necessity/);
+  assert.doesNotMatch(pend, /lia_opt_out/);
   assert.match(pend, /Liberar/);
   await c.close();
 });
@@ -263,7 +267,8 @@ test('guard_create_purpose cria rascunho com corpo plano e avisa que a pessoa li
   assert.ok(!isError(r), texto(r));
   const body = chamadas[0]!.body;
   assert.equal(body.title, 'Prevenção a fraude');
-  assert.equal(body.lia_opt_out, 'E-mail para dpo@x');
+  // Hguard-2345: o gcc (assisted-purpose.ts) recusa texto com 400.
+  assert.equal(body.lia_opt_out, true);
   assert.deepEqual(body.proposta, { agente: 'Claude Code', resumo: 'checkout coleta CPF' });
   assert.equal(body.agente, undefined);
   const out = JSON.parse(texto(r));
@@ -530,4 +535,13 @@ test('nenhuma ferramenta de finalidade chama /publish', () => {
   // node:test roda os testes de um arquivo em sequência: este vem por último.
   assert.ok(historico.length > 10);
   assert.ok(!historico.some((x) => /\/publish\b/.test(x.url)), 'alguma ferramenta chamou /publish');
+});
+
+test('Hguard-2345: lia_opt_out em texto é recusado pelo schema antes de chamar o Guard', async () => {
+  rotas = () => undefined;
+  const c = await client();
+  const r = await c.callTool({ name: 'guard_create_purpose', arguments: { ...LI_OK, lia_opt_out: 'E-mail para dpo@x' } });
+  assert.ok(isError(r));
+  assert.equal(chamadas.length, 0);
+  await c.close();
 });

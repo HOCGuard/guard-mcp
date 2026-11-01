@@ -36,7 +36,11 @@ export interface Lia {
   necessity?: string;
   balance?: string;
   safeguards?: string;
-  opt_out?: string;
+  /**
+   * Hguard-2345: no gcc é booleano (a pessoa pode se opor; padrão true). Texto
+   * só aparece em rascunho antigo gravado por MCP anterior à correção.
+   */
+  opt_out?: boolean | string;
   conclusion?: string;
 }
 

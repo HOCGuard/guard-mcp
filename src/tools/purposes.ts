@@ -82,7 +82,8 @@ export function validatePurposeRules({ basis, sensitive, lia }: RuleInput): stri
     blank(lia?.balance) ? 'lia_balance (fase 3: balanceamento com as expectativas e direitos da pessoa)' : null,
   ].filter((v): v is string => v !== null);
   if (faltando.length) problems.push(`Legítimo interesse exige o teste nas 3 fases. Falta: ${faltando.join('; ')}.`);
-  if (blank(lia?.opt_out)) problems.push('Legítimo interesse exige que a pessoa possa se opor: descreva como em lia_opt_out.');
+  // Hguard-2345: o gcc guarda opt_out como booleano (padrão true). Só é problema quando é false.
+  if (lia?.opt_out === false) problems.push('Legítimo interesse exige que a pessoa possa se opor: use lia_opt_out true e explique como se opor em lia_safeguards.');
   if (lia?.conclusion === 'desfavoravel') {
     problems.push('O teste de legítimo interesse concluiu desfavorável: essa base não pode ser usada. Escolha outra base legal (em geral, consentimento).');
   }
@@ -114,7 +115,7 @@ function readableContext(c: StudioContext) {
             necessidade: c.lia.necessity ?? null,
             balanceamento: c.lia.balance ?? null,
             salvaguardas: c.lia.safeguards ?? null,
-            como_se_opor: c.lia.opt_out ?? null,
+            pode_se_opor: c.lia.opt_out === undefined ? null : c.lia.opt_out !== false,
             conclusao: c.lia.conclusion ?? null,
           },
         }
@@ -158,8 +159,8 @@ const liaFields = {
   lia_interest: z.string().max(2000).optional().describe('Legítimo interesse, fase 1: qual é o interesse e de quem.'),
   lia_necessity: z.string().max(2000).optional().describe('Fase 2: por que é necessário e não há meio menos invasivo.'),
   lia_balance: z.string().max(2000).optional().describe('Fase 3: balanceamento com as expectativas e direitos da pessoa.'),
-  lia_safeguards: z.string().max(2000).optional().describe('Salvaguardas adotadas (minimização, pseudonimização, prazo curto).'),
-  lia_opt_out: z.string().max(2000).optional().describe('Como a pessoa se opõe ao tratamento. Obrigatório com legítimo interesse.'),
+  lia_safeguards: z.string().max(2000).optional().describe('Salvaguardas adotadas (minimização, pseudonimização, prazo curto) e como a pessoa se opõe.'),
+  lia_opt_out: z.boolean().optional().describe('A pessoa pode se opor ao tratamento (padrão true). Com legítimo interesse precisa ser true; explique como se opor em lia_safeguards.'),
   lia_conclusion: z.enum(LIA_CONCLUSIONS).optional().describe('Conclusão do teste de legítimo interesse.'),
 };
 
@@ -176,7 +177,7 @@ const contextFields = {
 
 const agenteField = z.string().min(1).max(60).optional().describe('Nome do agente, aparece para a pessoa na proposta. Ex: "Claude Code".');
 
-type LiaInput = { [K in keyof typeof liaFields]?: string | undefined };
+type LiaInput = { [K in Exclude<keyof typeof liaFields, 'lia_opt_out'>]?: string | undefined } & { lia_opt_out?: boolean | undefined };
 
 function liaFrom(input: LiaInput): Lia {
   const lia: Lia = {};
