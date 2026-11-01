@@ -5,6 +5,9 @@
  */
 export const DEFAULT_AUTH_URL = 'https://guard.hoc.app.br';
 
+/** Padrão de GUARD_API_URL: só serve para quem roda o consent-auditor na própria máquina. */
+export const DEFAULT_API_URL = 'http://localhost:3085';
+
 export interface Config {
   apiUrl: string;
   tenant: string;
@@ -41,7 +44,7 @@ export interface Config {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
-    apiUrl: (env['GUARD_API_URL'] ?? 'http://localhost:3085').replace(/\/$/, ''),
+    apiUrl: (env['GUARD_API_URL'] ?? DEFAULT_API_URL).replace(/\/$/, ''),
     tenant: env['GUARD_TENANT'] ?? 'public',
     requestTimeoutMs: Number(env['GUARD_REQUEST_TIMEOUT_MS'] ?? 15_000),
     sdkUrl: env['GUARD_SDK_URL'] ?? 'https://guard.hoc.app.br/sdk/banner.js',

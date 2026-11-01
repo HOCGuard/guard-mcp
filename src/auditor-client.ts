@@ -1,5 +1,5 @@
 import type { Config } from './config.ts';
-import { DEFAULT_AUTH_URL } from './config.ts';
+import { DEFAULT_API_URL, DEFAULT_AUTH_URL } from './config.ts';
 import type { RawReport } from './findings.ts';
 import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 import type { ScanFailure } from './scan-failure.ts';
@@ -74,6 +74,11 @@ export class AuditorClient {
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let bearer = await this.#tokens.currentToken();
+    // Hguard-2583: sem login, sem token de serviço e com o GUARD_API_URL padrão
+    // não há para onde ir; antes isso virava "fetch failed" em localhost.
+    if (!bearer && !this.#config.serviceToken && this.#config.apiUrl === DEFAULT_API_URL) {
+      throw new AuditorError('A varredura precisa do login no HOC Guard. Rode guard_login, conclua com guard_login_check e varra de novo.');
+    }
     let base = this.targetBase(bearer);
     let response = await this.doFetch(base, path, bearer, init);
 
