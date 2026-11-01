@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { detectRouter, detectTrackers } from '../generate/trackers.ts';
-import { buildBannerIntegration, bannerInstalled } from '../generate/banner.ts';
+import { buildBannerIntegration, bannerInstalled, installedWithNextScript } from '../generate/banner.ts';
 import { loadSources } from '../generate/collect.ts';
 import { detectFramework } from '../generate/framework.ts';
 
@@ -34,7 +34,7 @@ export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
         const router = detectRouter(sources);
         const framework = detectFramework(sources);
         const alreadyInstalled = bannerInstalled(sources);
-        const result = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled });
+        const result = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled, installedWithNextScript: installedWithNextScript(sources) });
         const warnings = [...result.warnings];
         if (truncated) warnings.push('Projeto grande: li os primeiros 2000 arquivos (diretórios app/src/pages/components primeiro). Confirme que o layout raiz foi incluído.');
         const payload = {
@@ -45,6 +45,8 @@ export function registerGenerateTools(server: McpServer, sdkUrl: string): void {
           purposes: result.purposes,
           changes: result.files,
           warnings,
+          cautions: result.cautions,
+          verify: result.verify,
         };
         return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
       } catch (error) {

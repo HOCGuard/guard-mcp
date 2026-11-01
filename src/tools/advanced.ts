@@ -7,7 +7,7 @@ import { buildReport } from '../generate/report.ts';
 import { explain, EXPLANATIONS } from '../generate/explain.ts';
 import { detectRouter, detectTrackers } from '../generate/trackers.ts';
 import { detectForms } from '../generate/forms.ts';
-import { buildBannerIntegration, bannerInstalled } from '../generate/banner.ts';
+import { buildBannerIntegration, bannerInstalled, installedWithNextScript } from '../generate/banner.ts';
 import { buildConsentPoints } from '../generate/consent-point.ts';
 import { detectFramework } from '../generate/framework.ts';
 
@@ -87,7 +87,7 @@ export function registerAdvancedTools(server: McpServer, sdkUrl: string): void {
         const router = detectRouter(src);
         const forms = detectForms(src);
         const framework = detectFramework(src);
-        const banner = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled: bannerInstalled(src) });
+        const banner = buildBannerIntegration({ router, bannerId: banner_id ?? null, sdkUrl, trackers, framework, alreadyInstalled: bannerInstalled(src), installedWithNextScript: installedWithNextScript(src) });
         const consent = buildConsentPoints(forms);
         const policy = buildPolicy(src, { dpoEmail: dpo_email });
 
@@ -103,7 +103,7 @@ export function registerAdvancedTools(server: McpServer, sdkUrl: string): void {
           score_depois_estimado,
           resolvido_ao_aplicar: antes.findings.filter((f) => RESOLVIDO_PELO_CODIGO.has(f.code)).map((f) => f.code),
           ainda_pendente: pendentes.map((f) => ({ code: f.code, acao: f.code === 'sem-link-politica' ? 'publicar a política e linkar no rodapé' : f.code === 'transferencia-internacional' ? 'declarar terceiros e garantir cláusulas contratuais' : 'ação humana' })),
-          banner: { mode: banner.mode, changes: banner.files, warnings: banner.warnings },
+          banner: { mode: banner.mode, changes: banner.files, warnings: banner.warnings, cautions: banner.cautions, verify: banner.verify },
           consent_points: { changes: consent.files, warnings: consent.warnings },
           policy: { policy_markdown: policy.markdown, warnings: policy.warnings },
           report_markdown: buildReport(antes.score, antes.findings),

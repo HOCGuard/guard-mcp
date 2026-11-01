@@ -53,9 +53,56 @@ test('gera integração a partir de conteúdo inline', async () => {
   assert.deepEqual(out['purposes'], ['necessary', 'analytics', 'marketing']);
   const layout = out['changes'].find((f: any) => f.path === 'app/layout.tsx' && f.code.includes('banner.js'));
   assert.match(layout.code, /data-banner-id="bn_1"/);
-  assert.match(layout.code, /strategy="beforeInteractive"/);
+  // Hguard-2581: como no guia do Guard, <script> comum como primeiro filho de
+  // <head>, com bloqueio prévio; nunca <Script> de next/script.
+  assert.match(layout.code, /<head>\s*\{\/\*[^*]*\*\/\}\s*<script\s/);
+  assert.match(layout.code, /data-autoblock="1"/);
+  assert.doesNotMatch(layout.code, /next\/script|beforeInteractive|async/);
   assert.ok(out['changes'].some((f: any) => f.code.includes('data-purpose="marketing"')));
   assert.deepEqual(out['warnings'], []);
+  assert.ok(out['cautions'].some((c: string) => /nonce/.test(c) && /guard\.test/.test(c)));
+  assert.ok(out['cautions'].some((c: string) => /data-hoc-src/.test(c) && /data-hoc-cat/.test(c)));
+  assert.ok(out['verify'].some((v: string) => /window\.HOCGuard\.getConsent\(\)/.test(v) && /hoc_guard_bn_1/.test(v)));
+});
+
+test('Hguard-2581: Pages Router põe o banner como primeiro filho de <Head>, não no <body>', async () => {
+  const c = await client();
+  const out = payload(await c.callTool({
+    name: 'guard_generate_cookie_banner',
+    arguments: { files: [{ path: 'pages/_app.tsx', content: "export default function App(){ return <script dangerouslySetInnerHTML={{ __html: \"fbq('init','1')\" }} /> }" }], banner_id: 'bn_2' },
+  }));
+  const doc = out['changes'].find((f: any) => f.path === 'pages/_document.tsx');
+  assert.ok(doc, 'sem _document');
+  assert.match(doc.code, /<Head>\s*\{\/\*[^*]*\*\/\}\s*<script\s/);
+  assert.ok(doc.code.indexOf('banner.js') < doc.code.indexOf('<body>'));
+  assert.doesNotMatch(doc.code, /next\/script/);
+  await c.close();
+});
+
+test('Hguard-2581: instalação antiga com <Script> de next/script vira aviso e troca', async () => {
+  const antigo = `import Script from 'next/script';
+export default function RootLayout({ children }) {
+  return (<html><body>{children}
+    <Script src="https://guard.hoc.app.br/sdk/banner.js" data-banner-id="bn_9" strategy="beforeInteractive" />
+  </body></html>);
+}`;
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_generate_cookie_banner', arguments: { files: [{ path: 'app/layout.tsx', content: antigo }], banner_id: 'bn_9' } }));
+  assert.equal(out['mode'], 'already-installed');
+  assert.ok(out['warnings'].some((w: string) => /next\/script/.test(w)));
+  assert.ok(out['changes'].some((f: any) => f.path === 'app/layout.tsx' && /data-autoblock="1"/.test(f.code)));
+  await c.close();
+});
+
+test('Hguard-2581: instalação correta já existente não gera troca', async () => {
+  const certo = `export default function RootLayout({ children }) {
+  return (<html><head><script src="https://guard.hoc.app.br/sdk/banner.js" data-banner-id="bn_8" data-autoblock="1"></script></head><body>{children}</body></html>);
+}`;
+  const c = await client();
+  const out = payload(await c.callTool({ name: 'guard_generate_cookie_banner', arguments: { files: [{ path: 'app/layout.tsx', content: certo }] } }));
+  assert.equal(out['mode'], 'already-installed');
+  assert.deepEqual(out['changes'], []);
+  await c.close();
 });
 
 test('lê o projeto do disco ignorando node_modules; sem tracker gera aviso informativo', async () => {
