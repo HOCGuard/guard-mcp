@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { AuditorClient, AuditorError } from '../auditor-client.ts';
 import { summarize } from '../findings.ts';
 import { explainFailure, failureMessage } from '../scan-failure.ts';
+import { GCC_SCAN_PREFIX, failureCodeOf, summarizeGccReport } from '../gcc-report.ts';
 
 const FRAMEWORKS = ['lgpd', 'gdpr', 'ccpa', 'all'] as const;
 const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
@@ -22,12 +23,14 @@ const statusOutput = z.object({
   status: z.string(),
   elapsed_seconds: z.number().optional(),
   ready: z.boolean(),
+  link: z.string().optional(),
   reason: z.string().optional(),
   motivo: z.string().optional(),
   next: z.string().optional(),
   retry_helps: z.boolean().optional(),
 });
 
+// Mesma forma para o resultado do auditor e o do relatório do Guard (Hguard-2582).
 const resultsOutput = z.object({
   url: z.string().optional(),
   verdict: z.enum(['confirmado', 'preliminar', 'nao_vimos_o_site']),
@@ -35,19 +38,21 @@ const resultsOutput = z.object({
   grade: z.string().optional(),
   score: z.number().optional(),
   coverage: z.number().optional(),
+  link: z.string().optional(),
+  pillars: z.array(z.object({ id: z.string(), grade: z.string().optional(), problems: z.number().optional() })).optional(),
   not_measured: z.array(z.object({ phase: z.string(), reason: z.string().optional() })).optional(),
-  counts: z.object({
-    critical: z.number(), high: z.number(), medium: z.number(), low: z.number(),
-    passed: z.number(), uncertain: z.number(), uncertain_important: z.number(),
-  }),
+  counts: z.record(z.string(), z.number()),
   findings: z.array(z.object({
     id: z.string(),
-    severity: z.enum(SEVERITIES),
     label: z.string(),
+    kind: z.enum(['check', 'dark_pattern', 'achado', 'pergunta']),
+    severity: z.enum(SEVERITIES).optional(),
+    priority: z.enum(['corrigir', 'melhorar']).optional(),
+    action: z.string().optional(),
     detail: z.string().optional(),
-    kind: z.enum(['check', 'dark_pattern']),
     uncertain: z.literal(true).optional(),
   })),
+  passed: z.array(z.string()).optional(),
   truncated: z.number().optional(),
 });
 
@@ -80,7 +85,10 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
         return text({
           scan_id: started.job_id,
           estimated_seconds: started.estimated_duration_seconds ?? 120,
-          next: 'Chame guard_get_scan_status com este scan_id. Quando status for completed, chame guard_get_scan_results.',
+          ...(started.link ? { link: started.link } : {}),
+          next: started.link
+            ? 'Chame guard_get_scan_status com este scan_id. Quando status for completed, chame guard_get_scan_results. A análise também aparece em Sites, no link.'
+            : 'Chame guard_get_scan_status com este scan_id. Quando status for completed, chame guard_get_scan_results.',
         });
       } catch (error) {
         return failure(error);
@@ -111,6 +119,7 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
           status: status.status,
           elapsed_seconds: status.elapsed_ms ? Math.round(status.elapsed_ms / 1000) : undefined,
           ready: status.status === 'completed',
+          ...(status.link ? { link: status.link } : {}),
         };
         if (status.status !== 'failed') return structured(base);
         // Hguard-2578: sem o motivo o agente ficava consultando em loop.
@@ -143,6 +152,16 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
     },
     async ({ scan_id, include_passed, limit }) => {
       try {
+        if (scan_id.startsWith(GCC_SCAN_PREFIX)) {
+          // Hguard-2582: análise pelo gcc; o resultado é o relatório do Guard.
+          const { rel, link } = await client.getGccReport(scan_id);
+          const st = rel.analise?.status;
+          if (st === 'failed') return failure(new AuditorError(failureMessage(scan_id, { code: failureCodeOf(rel) })));
+          if (st !== 'completed') {
+            return failure(new AuditorError('A varredura ainda não terminou. Consulte guard_get_scan_status e tente de novo quando estiver completed.'));
+          }
+          return structured({ ...summarizeGccReport(rel, link, { includePassed: include_passed, limit }) });
+        }
         const report = await client.getReport(scan_id);
         return structured({ ...summarize(report, { includePassed: include_passed, limit }) });
       } catch (error) {

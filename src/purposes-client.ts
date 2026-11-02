@@ -10,7 +10,11 @@ import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 export const PURPOSES_READ_SCOPE = 'gcc:purposes:read';
 export const PURPOSES_WRITE_SCOPE = 'gcc:purposes:write';
 // Documentos jurídicos (gcc:policy:*) entram no padrão: rascunho de política e termos (Hguard-2015).
-export const PURPOSES_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE} gcc:policy:read gcc:policy:write`;
+/** Login de antes da Hguard-2582: servidor sem gcc:audit:* na allowlist recusa o pedido novo com invalid_scope. */
+export const LEGACY_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE} gcc:policy:read gcc:policy:write`;
+/** Hguard-2582: gcc:audit:* faz a varredura entrar em Sites, com o relatório do Guard. */
+export const AUDIT_SCOPES = ['gcc:audit:read', 'gcc:audit:write'] as const;
+export const PURPOSES_LOGIN_SCOPE = `${LEGACY_LOGIN_SCOPE} ${AUDIT_SCOPES.join(' ')}`;
 
 export type LegalBasis = 'consent' | 'legitimate_interest' | 'contract' | 'legal_obligation';
 

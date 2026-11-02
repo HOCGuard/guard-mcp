@@ -93,7 +93,13 @@ export async function requestDeviceCode(
     );
   }
   if (!res.ok) {
-    throw new DeviceFlowError(`Falha ao iniciar o login: ${await parseError(res)}`);
+    // Hguard-2582: guarda o código OAuth (ex.: invalid_scope) para quem chama decidir.
+    const texto = await res.text();
+    let corpo: { error?: string; error_description?: string } = {};
+    try {
+      corpo = JSON.parse(texto) as typeof corpo;
+    } catch { /* corpo não-JSON */ }
+    throw new DeviceFlowError(`Falha ao iniciar o login: ${corpo.error_description ?? corpo.error ?? `HTTP ${res.status}`}`, corpo.error);
   }
   return (await res.json()) as DeviceCodeResponse;
 }

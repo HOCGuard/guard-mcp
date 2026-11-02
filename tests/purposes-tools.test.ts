@@ -171,7 +171,7 @@ test('guard_login pede por padrão os scopes de finalidade', async () => {
   const { tools } = await c.listTools();
   const login = tools.find((t) => t.name === 'guard_login')!;
   const scope = (login.inputSchema.properties as Record<string, { default?: string }>)['scope']!;
-  assert.equal(scope.default, 'scan generate gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write');
+  assert.equal(scope.default, 'scan generate gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write gcc:audit:read gcc:audit:write');
   await c.close();
 });
 
