@@ -27,6 +27,8 @@ export interface GccRelatorio {
     inconclusiva?: boolean;
     motivo_nao_visto?: 'blocked' | 'empty' | 'error_page' | null;
     erro?: string | null;
+    /** Código estável da falha; o gcc manda no lugar do texto para agente. */
+    erro_codigo?: string | null;
   };
   nota?: string | null;
   score?: number | null;
@@ -166,9 +168,14 @@ export function failureCodeFromText(erro: string | null | undefined): string {
   const t = (erro ?? '').toLowerCase();
   if (/robots\.txt/.test(t) && /(proib|disallow|bloque)/.test(t)) return 'blocked_by_robots_txt';
   if (/robots/.test(t)) return 'robots_unreachable';
-  if (/timeout|tempo/.test(t)) return 'timeout';
+  if (/timeout|tempo esgotado/.test(t)) return 'timeout';
   if (/captcha/.test(t)) return 'captcha_blocked';
   if (/net::|unreachable|enotfound|econnrefused|fora do ar/.test(t)) return 'site_unreachable';
   if (/redirect/.test(t)) return 'redirected_off_site';
   return 'internal_error';
+}
+
+/** Código da falha: o que o gcc já manda (erro_codigo) ou, em gcc antigo, o texto classificado. */
+export function failureCodeOf(rel: GccRelatorio): string {
+  return rel.analise?.erro_codigo || failureCodeFromText(rel.analise?.erro);
 }

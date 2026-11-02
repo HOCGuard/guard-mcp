@@ -19,6 +19,8 @@ let chamadas: Array<{ method: string; url: string; body: string }> = [];
 let rotaGccFechada = false;
 let posseFaltando = false;
 let relatorio: Record<string, unknown> = {};
+let semId = false;
+let semScope = false;
 
 const REL_OK = {
   analise: { id: 'a1', url: 'https://exemplo.com.br', status: 'completed', nota: 'C', score: 61, motivo_nao_visto: null },
@@ -46,6 +48,16 @@ before(async () => {
         if (rotaGccFechada) {
           res.writeHead(403);
           res.end(JSON.stringify({ type: 'urn:hoc:error:agent:blocked', status: 403, detail: 'Rota fora do alcance.', motivo: 'rota-nao-permitida' }));
+          return;
+        }
+        if (semScope) {
+          res.writeHead(403);
+          res.end(JSON.stringify({ type: 'urn:hoc:error:gcc:insufficient-scope', status: 403, detail: 'Esta rota exige um dos scopes: gcc:audit:write.' }));
+          return;
+        }
+        if (semId) {
+          res.writeHead(202);
+          res.end(JSON.stringify({ job_id: 'j9', status: 'queued' }));
           return;
         }
         if (posseFaltando) {
@@ -94,6 +106,8 @@ beforeEach(() => {
   chamadas = [];
   rotaGccFechada = false;
   posseFaltando = false;
+  semId = false;
+  semScope = false;
   relatorio = structuredClone(REL_OK);
 });
 
@@ -216,4 +230,40 @@ test('código de falha a partir do texto do gcc', () => {
   assert.equal(failureCodeFromText('timeout: audit deadline exceeded'), 'timeout');
   assert.equal(failureCodeFromText('net::ERR_NAME_NOT_RESOLVED'), 'site_unreachable');
   assert.equal(failureCodeFromText(null), 'internal_error');
+});
+
+test('revisão: 2xx sem id não cai no caminho antigo (não pede duas vezes)', async () => {
+  semId = true;
+  const c = await client(COM_GCC);
+  const r = await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } }) as { isError?: boolean };
+  assert.equal(r.isError, true);
+  assert.ok(!chamadas.some((x) => x.url === '/api/v1/consent/audit'));
+  await c.close();
+});
+
+test('revisão: papel sem gcc:audit:write com token vivo volta ao caminho antigo', async () => {
+  semScope = true;
+  const c = await client(COM_GCC);
+  const r = json(await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } }));
+  assert.equal(r.scan_id, 'legado-1');
+  await c.close();
+});
+
+test('revisão: scan_id gcc com caminho é recusado sem chamar o Guard', async () => {
+  const c = await client(COM_GCC);
+  for (const id of ['gcc:..', 'gcc:a1/../x', 'gcc:']) {
+    const r = await c.callTool({ name: 'guard_get_scan_results', arguments: { scan_id: id } }) as { isError?: boolean };
+    assert.equal(r.isError, true, id);
+  }
+  assert.ok(!chamadas.some((x) => x.url.includes('/relatorio') && !x.url.includes('/a1/')));
+  await c.close();
+});
+
+test('revisão: falha usa o erro_codigo do gcc e lê o relatório uma vez', async () => {
+  relatorio = { analise: { id: 'a1', status: 'failed', erro: null, erro_codigo: 'captcha_blocked' } };
+  const c = await client(COM_GCC);
+  const r = await c.callTool({ name: 'guard_get_scan_results', arguments: { scan_id: 'gcc:a1' } });
+  assert.match(texto(r), /anti-robô/);
+  assert.equal(chamadas.filter((x) => x.url === '/api/v1/gcc/audits/a1/relatorio').length, 1);
+  await c.close();
 });

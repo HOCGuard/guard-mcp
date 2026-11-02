@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { AuditorClient, AuditorError } from '../auditor-client.ts';
 import { summarize } from '../findings.ts';
 import { explainFailure, failureMessage } from '../scan-failure.ts';
-import { GCC_SCAN_PREFIX, summarizeGccReport } from '../gcc-report.ts';
+import { GCC_SCAN_PREFIX, failureCodeOf, summarizeGccReport } from '../gcc-report.ts';
 
 const FRAMEWORKS = ['lgpd', 'gdpr', 'ccpa', 'all'] as const;
 const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
@@ -156,10 +156,7 @@ export function registerScanTools(server: McpServer, client: AuditorClient): voi
           // Hguard-2582: análise pelo gcc; o resultado é o relatório do Guard.
           const { rel, link } = await client.getGccReport(scan_id);
           const st = rel.analise?.status;
-          if (st === 'failed') {
-            const status = await client.getStatus(scan_id);
-            return failure(new AuditorError(failureMessage(scan_id, status.failure)));
-          }
+          if (st === 'failed') return failure(new AuditorError(failureMessage(scan_id, { code: failureCodeOf(rel) })));
           if (st !== 'completed') {
             return failure(new AuditorError('A varredura ainda não terminou. Consulte guard_get_scan_status e tente de novo quando estiver completed.'));
           }

@@ -3,7 +3,7 @@ import { DEFAULT_API_URL, DEFAULT_AUTH_URL } from './config.ts';
 import type { RawReport } from './findings.ts';
 import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 import type { ScanFailure } from './scan-failure.ts';
-import { GCC_SCAN_PREFIX, failureCodeFromText, reportLink, type GccRelatorio } from './gcc-report.ts';
+import { GCC_SCAN_PREFIX, failureCodeOf, reportLink, type GccRelatorio } from './gcc-report.ts';
 
 export interface StartedScan {
   job_id: string;
@@ -24,7 +24,11 @@ export interface ScanStatus {
 // Hguard-2582: motivos do portão/gcc que dizem "esta rota ainda não existe
 // para agentes" (servidor anterior à varredura pelo gcc). Aí volta ao caminho
 // de antes em vez de falhar.
-const ROTA_AINDA_FECHADA = new Set(['rota-nao-permitida', 'agent-route-not-allowed']);
+// insufficient-scope: o papel perdeu gcc:audit:* com o token ainda vivo; o
+// caminho de antes, com scan, ainda serve.
+const ROTA_AINDA_FECHADA = new Set(['rota-nao-permitida', 'agent-route-not-allowed', 'insufficient-scope']);
+// Id de análise do gcc (ULID/UUID): nada de barra, ponto ou outro caractere de caminho.
+const ID_ANALISE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export class AuditorError extends Error {
   readonly status: number | undefined;
@@ -124,13 +128,16 @@ export class AuditorClient {
           { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url, framework }) },
           this.#authOrigin,
         );
-        if (r.audit_report_id) {
-          return {
-            job_id: `${GCC_SCAN_PREFIX}${r.audit_report_id}`,
-            estimated_duration_seconds: r.status === 'cached' ? 0 : 120,
-            link: reportLink(this.#authOrigin, r.audit_report_id),
-          };
+        // Resposta sem id: a análise pode ter sido pedida. Cair no caminho de
+        // antes seria pedir duas vezes (e gastar duas cotas).
+        if (!r.audit_report_id || !ID_ANALISE.test(r.audit_report_id)) {
+          throw new AuditorError('O Guard aceitou o pedido mas não devolveu o número da análise. Confira em Sites no Guard antes de varrer de novo.');
         }
+        return {
+          job_id: `${GCC_SCAN_PREFIX}${r.audit_report_id}`,
+          estimated_duration_seconds: r.status === 'cached' ? 0 : 120,
+          link: reportLink(this.#authOrigin, r.audit_report_id),
+        };
       } catch (error) {
         if (!(error instanceof AuditorError && error.code && ROTA_AINDA_FECHADA.has(error.code))) throw error;
       }
@@ -150,6 +157,7 @@ export class AuditorClient {
   /** Relatório do gcc (Hguard-2582): status e resultado saem da mesma leitura. */
   async getGccReport(scanId: string): Promise<{ rel: GccRelatorio; link: string }> {
     const id = scanId.slice(GCC_SCAN_PREFIX.length);
+    if (!ID_ANALISE.test(id)) throw new AuditorError('scan_id inválido. Use o scan_id devolvido por guard_scan_site.');
     const rel = await this.request<GccRelatorio>(`/api/v1/gcc/audits/${encodeURIComponent(id)}/relatorio`, undefined, this.#authOrigin);
     return { rel, link: reportLink(this.#authOrigin, id) };
   }
@@ -160,7 +168,7 @@ export class AuditorClient {
       const status = rel.analise?.status ?? 'queued';
       // O texto de erro do gcc fica de fora: só o código estável vai ao agente.
       return status === 'failed'
-        ? { job_id: jobId, status, link, failure: { code: failureCodeFromText(rel.analise?.erro) } }
+        ? { job_id: jobId, status, link, failure: { code: failureCodeOf(rel) } }
         : { job_id: jobId, status, link };
     }
     return this.request<ScanStatus>(`/audit/${encodeURIComponent(jobId)}/status`);
