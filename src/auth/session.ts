@@ -29,6 +29,8 @@ export interface TokenProvider {
   currentToken(): Promise<string | null>;
   /** Força uma renovação (usa o mesmo lock de currentToken). Chame depois de um 401 da API pra tentar de novo uma única vez. */
   forceRefresh(): Promise<string | null>;
+  /** Scopes do login guardado (vazio sem login). Hguard-2582: decide se a varredura vai pelo gcc. */
+  currentScopes?(): Promise<string[]>;
 }
 
 export function createTokenProvider(config: Config, opts: { fetchImpl?: FetchImpl } = {}): TokenProvider {
@@ -90,6 +92,10 @@ export function createTokenProvider(config: Config, opts: { fetchImpl?: FetchImp
     },
     forceRefresh() {
       return refreshOnce();
+    },
+    async currentScopes() {
+      const cred = await loadCredentials(credPath);
+      return (cred?.scope ?? '').split(/\s+/).filter(Boolean);
     },
   };
 }

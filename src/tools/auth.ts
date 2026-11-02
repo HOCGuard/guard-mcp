@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { Config } from '../config.ts';
 import { DEFAULT_AUTH_URL } from '../config.ts';
-import { PURPOSES_LOGIN_SCOPE } from '../purposes-client.ts';
+import { LEGACY_LOGIN_SCOPE, PURPOSES_LOGIN_SCOPE } from '../purposes-client.ts';
 import {
   resolveCredentialsPath,
   resolvePendingPath,
@@ -62,12 +62,22 @@ export function registerAuthTools(server: McpServer, config: Config): void {
         // clientInfo do handshake `initialize`: mesmo acessor que telemetry.ts
         // já usa pra identificar o cliente MCP (deprecated, mas funcional).
         const clientInfoName = server.server.getClientVersion()?.name;
-        const device = await requestDeviceCode(authUrl, {
-          clientId: GUARD_MCP_CLIENT_ID,
-          scope,
-          agentName: buildAgentName(clientInfoName),
-          agentClient: mapAgentClient(clientInfoName),
-        });
+        const pedir = (s: string) =>
+          requestDeviceCode(authUrl, {
+            clientId: GUARD_MCP_CLIENT_ID,
+            scope: s,
+            agentName: buildAgentName(clientInfoName),
+            agentClient: mapAgentClient(clientInfoName),
+          });
+        let device;
+        try {
+          device = await pedir(scope);
+        } catch (error) {
+          // Hguard-2582: servidor que ainda não libera gcc:audit:* recusa o
+          // pedido padrão inteiro; pede o de antes para o login não quebrar.
+          if (!(error instanceof DeviceFlowError && error.code === 'invalid_scope' && scope === PURPOSES_LOGIN_SCOPE)) throw error;
+          device = await pedir(LEGACY_LOGIN_SCOPE);
+        }
         await savePendingLogin(pendingPath, {
           device_code: device.device_code,
           user_code: device.user_code,
