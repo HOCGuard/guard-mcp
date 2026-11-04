@@ -1,9 +1,10 @@
 /**
- * Default do issuer OAuth do Guard (Device Flow, RFC 8628). Em produção o issuer
- * é guard.hoc.app.br (o discovery de prod anuncia esse iss, e auth.grupohoc.com.br
- * não resolve). Sobrescreva com GUARD_AUTH_URL pra outros ambientes.
+ * Default do issuer OAuth do Guard (Device Flow, RFC 8628). Desde 04/11/2026 o
+ * console e o login moram em app.hocguard.com (o discovery anuncia esse iss).
+ * guard.hoc.app.br continua respondendo para instalações antigas.
+ * Sobrescreva com GUARD_AUTH_URL pra outros ambientes.
  */
-export const DEFAULT_AUTH_URL = 'https://guard.hoc.app.br';
+export const DEFAULT_AUTH_URL = 'https://app.hocguard.com';
 
 /** Padrão de GUARD_API_URL: só serve para quem roda o consent-auditor na própria máquina. */
 export const DEFAULT_API_URL = 'http://localhost:3085';
@@ -47,7 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     apiUrl: (env['GUARD_API_URL'] ?? DEFAULT_API_URL).replace(/\/$/, ''),
     tenant: env['GUARD_TENANT'] ?? 'public',
     requestTimeoutMs: Number(env['GUARD_REQUEST_TIMEOUT_MS'] ?? 15_000),
-    sdkUrl: env['GUARD_SDK_URL'] ?? 'https://guard.hoc.app.br/sdk/banner.js',
+    sdkUrl: env['GUARD_SDK_URL'] ?? 'https://cdn.hocguard.com/sdk/banner.js',
     serviceToken: env['GUARD_SERVICE_TOKEN'],
     authUrl: (env['GUARD_AUTH_URL'] ?? DEFAULT_AUTH_URL).replace(/\/$/, ''),
     credentialsPath: env['GUARD_CREDENTIALS_PATH'],
