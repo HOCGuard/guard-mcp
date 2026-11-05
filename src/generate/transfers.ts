@@ -21,7 +21,7 @@ export const TRANSFER_RULES: TransferRule[] = [
   { id: 'cloudflare', service: 'Cloudflare', country: 'EUA', patterns: [/cloudflare(insights|\.com)/, /challenges\.cloudflare\.com/] },
   { id: 'openai', service: 'OpenAI', country: 'EUA', patterns: [/api\.openai\.com/, /['"]openai['"]/] },
   { id: 'stripe', service: 'Stripe', country: 'EUA', patterns: [/js\.stripe\.com/, /api\.stripe\.com/, /@stripe\//] },
-  { id: 'sentry', service: 'Sentry', country: 'EUA (Funcahashi/Alemanha conforme região)', patterns: [/@sentry\//, /sentry\.io/, /ingest\.sentry/] },
+  { id: 'sentry', service: 'Sentry', country: 'EUA', patterns: [/@sentry\//, /sentry\.io/, /ingest\.sentry/] },
   { id: 'intercom', service: 'Intercom', country: 'EUA', patterns: [/widget\.intercom\.io/, /@intercom\//] },
   { id: 'mailchimp', service: 'Mailchimp', country: 'EUA', patterns: [/chimpstatic\.com/, /list-manage\.com/, /mailchimp/i] },
   { id: 'sendgrid', service: 'SendGrid', country: 'EUA', patterns: [/@sendgrid\//, /api\.sendgrid\.com/] },
