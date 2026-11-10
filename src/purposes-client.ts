@@ -7,14 +7,18 @@ import { createTokenProvider, type TokenProvider } from './auth/session.ts';
 // (guard_login) contra a mesma origem do issuer. Nunca publica: publicar é
 // ação humana na tela do Guard (o gcc recusa com publish-human-only).
 
-export const PURPOSES_READ_SCOPE = 'gcc:purposes:read';
-export const PURPOSES_WRITE_SCOPE = 'gcc:purposes:write';
-// Documentos jurídicos (gcc:policy:*) entram no padrão: rascunho de política e termos (Hguard-2015).
-/** Login de antes da Hguard-2582: servidor sem gcc:audit:* na allowlist recusa o pedido novo com invalid_scope. */
-export const LEGACY_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE} gcc:policy:read gcc:policy:write`;
-/** Hguard-2582: gcc:audit:* faz a varredura entrar em Sites, com o relatório do Guard. */
-export const AUDIT_SCOPES = ['gcc:audit:read', 'gcc:audit:write'] as const;
-export const PURPOSES_LOGIN_SCOPE = `${LEGACY_LOGIN_SCOPE} ${AUDIT_SCOPES.join(' ')}`;
+import { SCOPE_PAIRS, hasScope, parseScopes } from './scopes.ts';
+
+export const PURPOSES_READ_SCOPE = 'read:gcc.purposes:tenant';
+export const PURPOSES_WRITE_SCOPE = 'write:gcc.purposes:tenant';
+// Documentos jurídicos (políticas e termos) entram no padrão: rascunho (Hguard-2015).
+/** Varredura em Sites, com o relatório do Guard (Hguard-2582). */
+export const AUDIT_SCOPES = ['read:gcc.audit:tenant', 'write:gcc.audit:tenant'] as const;
+export const PURPOSES_LOGIN_SCOPE = `scan generate ${PURPOSES_READ_SCOPE} ${PURPOSES_WRITE_SCOPE} read:gcc.policy:tenant write:gcc.policy:tenant ${AUDIT_SCOPES.join(' ')}`;
+/** Servidor antigo recusa o nome canônico com invalid_scope: pedido de antes, com os nomes antigos. */
+export const LEGACY_FULL_LOGIN_SCOPE = `scan generate ${SCOPE_PAIRS.map((p) => p.legacy).join(' ')}`;
+/** Login de antes da Hguard-2582: sem gcc:audit:*. */
+export const LEGACY_LOGIN_SCOPE = 'scan generate gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write';
 
 export type LegalBasis = 'consent' | 'legitimate_interest' | 'contract' | 'legal_obligation';
 
@@ -126,8 +130,8 @@ export class PurposesClient {
       throw new PurposesError(`Você não está conectado ao HOC Guard (ou o login expirou). ${loginHint()}`, 401);
     }
     const cred = await loadCredentials(this.#credentialsPath);
-    const granted = (cred?.scope ?? '').split(/\s+/).filter(Boolean);
-    if (granted.length > 0 && !granted.includes(scope)) {
+    const granted = parseScopes(cred?.scope);
+    if (granted.length > 0 && !hasScope(granted, scope)) {
       throw new PurposesError(missingScopeMessage(scope), 403, 'missing-scope');
     }
     return token;

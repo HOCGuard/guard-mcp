@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { Config } from '../config.ts';
 import { DEFAULT_AUTH_URL } from '../config.ts';
-import { LEGACY_LOGIN_SCOPE, PURPOSES_LOGIN_SCOPE } from '../purposes-client.ts';
+import { LEGACY_FULL_LOGIN_SCOPE, LEGACY_LOGIN_SCOPE, PURPOSES_LOGIN_SCOPE } from '../purposes-client.ts';
 import {
   resolveCredentialsPath,
   resolvePendingPath,
@@ -70,13 +70,16 @@ export function registerAuthTools(server: McpServer, config: Config): void {
             agentClient: mapAgentClient(clientInfoName),
           });
         let device;
-        try {
-          device = await pedir(scope);
-        } catch (error) {
-          // Hguard-2582: servidor que ainda não libera gcc:audit:* recusa o
-          // pedido padrão inteiro; pede o de antes para o login não quebrar.
-          if (!(error instanceof DeviceFlowError && error.code === 'invalid_scope' && scope === PURPOSES_LOGIN_SCOPE)) throw error;
-          device = await pedir(LEGACY_LOGIN_SCOPE);
+        // Servidor antigo recusa o pedido padrão inteiro com invalid_scope:
+        // cai para os nomes antigos e, por fim, para o pedido sem auditoria.
+        const tentativas = scope === PURPOSES_LOGIN_SCOPE ? [scope, LEGACY_FULL_LOGIN_SCOPE, LEGACY_LOGIN_SCOPE] : [scope];
+        for (let i = 0; ; i++) {
+          try {
+            device = await pedir(tentativas[i]!);
+            break;
+          } catch (error) {
+            if (!(error instanceof DeviceFlowError && error.code === 'invalid_scope') || i >= tentativas.length - 1) throw error;
+          }
         }
         await savePendingLogin(pendingPath, {
           device_code: device.device_code,

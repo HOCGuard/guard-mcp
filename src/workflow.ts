@@ -27,7 +27,7 @@ export const SECURE_SHIP_DESCRIPTION =
 // prompt MCP e para skills/guard-map-purposes/SKILL.md.
 export const MAP_PURPOSES_STEPS = `Você vai mapear as finalidades de tratamento de dados deste projeto e propô-las na conta do HOC Guard. Tudo o que você criar ou editar vira RASCUNHO: quem libera é a pessoa, na tela do Guard. Você nunca publica.
 
-1. Login. Se alguma ferramenta de finalidades responder que falta login ou permissão, chame guard_login (o scope padrão já inclui gcc:purposes:read e gcc:purposes:write), mostre o link ao usuário e conclua com guard_login_check.
+1. Login. Se alguma ferramenta de finalidades responder que falta login ou permissão, chame guard_login (o scope padrão já inclui read:gcc.purposes:tenant e write:gcc.purposes:tenant), mostre o link ao usuário e conclua com guard_login_check.
 
 2. O que já existe. Chame guard_list_purposes para ver as finalidades da conta. Para as que parecerem relacionadas ao projeto, chame guard_get_purpose e anote as pendências.
 
