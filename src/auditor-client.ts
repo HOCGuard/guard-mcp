@@ -1,4 +1,5 @@
 import type { Config } from './config.ts';
+import { hasScope } from './scopes.ts';
 import { DEFAULT_API_URL, DEFAULT_AUTH_URL } from './config.ts';
 import type { RawReport } from './findings.ts';
 import { createTokenProvider, type TokenProvider } from './auth/session.ts';
@@ -24,7 +25,7 @@ export interface ScanStatus {
 // Hguard-2582: motivos do portão/gcc que dizem "esta rota ainda não existe
 // para agentes" (servidor anterior à varredura pelo gcc). Aí volta ao caminho
 // de antes em vez de falhar.
-// insufficient-scope: o papel perdeu gcc:audit:* com o token ainda vivo; o
+// insufficient-scope: o papel perdeu a permissão de auditoria com o token ainda vivo; o
 // caminho de antes, com scan, ainda serve.
 const ROTA_AINDA_FECHADA = new Set(['rota-nao-permitida', 'agent-route-not-allowed', 'insufficient-scope']);
 // Id de análise do gcc (ULID/UUID): nada de barra, ponto ou outro caractere de caminho.
@@ -85,12 +86,12 @@ export class AuditorClient {
     }
   }
 
-  /** Login com gcc:audit:* e varredura pelo core ligada: a análise vai pelo gcc (Hguard-2582). */
+  /** Login com permissão de auditoria e varredura pelo core ligada: a análise vai pelo gcc (Hguard-2582). */
   private async viaGcc(): Promise<boolean> {
     if (this.#config.scanViaCore === false) return false;
     if (!(await this.#tokens.currentToken())) return false;
     const scopes = (await this.#tokens.currentScopes?.()) ?? [];
-    return scopes.includes('gcc:audit:write') && scopes.includes('gcc:audit:read');
+    return hasScope(scopes, 'write:gcc.audit:tenant') && hasScope(scopes, 'read:gcc.audit:tenant');
   }
 
   private async request<T>(path: string, init?: RequestInit, base0?: string): Promise<T> {

@@ -21,6 +21,7 @@ let posseFaltando = false;
 let relatorio: Record<string, unknown> = {};
 let semId = false;
 let semScope = false;
+let recusa = /audit/;
 
 const REL_OK = {
   analise: { id: 'a1', url: 'https://exemplo.com.br', status: 'completed', nota: 'C', score: 61, motivo_nao_visto: null },
@@ -81,7 +82,7 @@ before(async () => {
       }
       if (req.url === '/oauth/device/code') {
         const scope = new URLSearchParams(raw).get('scope') ?? '';
-        if (scope.includes('gcc:audit')) {
+        if (recusa.test(scope)) {
           res.writeHead(400);
           res.end(JSON.stringify({ error: 'invalid_scope', error_description: 'scope fora da allowlist' }));
           return;
@@ -103,6 +104,7 @@ after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 beforeEach(() => {
+  recusa = /audit/;
   chamadas = [];
   rotaGccFechada = false;
   posseFaltando = false;
@@ -121,7 +123,8 @@ async function client(scope: string | null) {
   return c;
 }
 
-const COM_GCC = 'scan generate gcc:audit:read gcc:audit:write';
+const COM_GCC = 'scan generate read:gcc.audit:tenant write:gcc.audit:tenant';
+const COM_GCC_ANTIGO = 'scan generate gcc:audit:read gcc:audit:write';
 function json(r: unknown) {
   return JSON.parse((r as { content: { text: string }[] }).content[0]!.text);
 }
@@ -137,6 +140,13 @@ test('login com gcc:audit:* varre pelo gcc só com url e framework, e devolve o 
   const post = chamadas.find((x) => x.url === '/api/v1/gcc/audits')!;
   assert.deepEqual(JSON.parse(post.body), { url: 'https://exemplo.com.br', framework: 'lgpd' });
   assert.ok(!chamadas.some((x) => x.url.startsWith('/api/v1/consent')));
+  await c.close();
+});
+
+test('credencial antiga guardada com os nomes antigos continua varrendo pelo gcc', async () => {
+  const c = await client(COM_GCC_ANTIGO);
+  const r = json(await c.callTool({ name: 'guard_scan_site', arguments: { url: 'https://exemplo.com.br' } }));
+  assert.equal(r.scan_id, 'gcc:a1');
   await c.close();
 });
 
@@ -201,14 +211,36 @@ test('domínio sem posse verificada vira orientação, não "login expirou"', as
   await c.close();
 });
 
-test('guard_login: servidor que recusa gcc:audit:* recebe o pedido de antes', async () => {
+test('guard_login: servidor que recusa tudo de auditoria recebe, por fim, o pedido de antes', async () => {
+  recusa = /audit/;
   const c = await client(null);
   const r = await c.callTool({ name: 'guard_login', arguments: {} });
   assert.match(texto(r), /AAAA-BBBB/);
   const pedidos = chamadas.filter((x) => x.url === '/oauth/device/code').map((x) => new URLSearchParams(x.body).get('scope'));
+  assert.equal(pedidos.length, 3);
+  assert.match(pedidos[0]!, /write:gcc\.audit:tenant/);
+  assert.match(pedidos[1]!, /gcc:audit:write/);
+  assert.doesNotMatch(pedidos[2]!, /audit/);
+  await c.close();
+});
+
+test('guard_login: pede os nomes canônicos de primeira', async () => {
+  recusa = /^$/;
+  const c = await client(null);
+  await c.callTool({ name: 'guard_login', arguments: {} });
+  const pedidos = chamadas.filter((x) => x.url === '/oauth/device/code').map((x) => new URLSearchParams(x.body).get('scope'));
+  assert.equal(pedidos.length, 1);
+  assert.equal(pedidos[0], 'scan generate read:gcc.purposes:tenant write:gcc.purposes:tenant read:gcc.policy:tenant write:gcc.policy:tenant read:gcc.audit:tenant write:gcc.audit:tenant');
+  await c.close();
+});
+
+test('guard_login: core antigo (recusa o canônico, aceita o antigo) cai para os nomes antigos com auditoria', async () => {
+  recusa = /:tenant/;
+  const c = await client(null);
+  await c.callTool({ name: 'guard_login', arguments: {} });
+  const pedidos = chamadas.filter((x) => x.url === '/oauth/device/code').map((x) => new URLSearchParams(x.body).get('scope'));
   assert.equal(pedidos.length, 2);
-  assert.match(pedidos[0]!, /gcc:audit:write/);
-  assert.doesNotMatch(pedidos[1]!, /gcc:audit/);
+  assert.equal(pedidos[1], 'scan generate gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write gcc:audit:read gcc:audit:write');
   await c.close();
 });
 

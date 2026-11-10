@@ -49,7 +49,7 @@ after(async () => {
 beforeEach(async () => {
   chamadas = [];
   rotas = () => undefined;
-  await writeFile(credPath, JSON.stringify({ access_token: 'jwt', expires_at: Date.now() + 3_600_000, scope: 'gcc:policy:read gcc:policy:write' }));
+  await writeFile(credPath, JSON.stringify({ access_token: 'jwt', expires_at: Date.now() + 3_600_000, scope: 'read:gcc.policy:tenant write:gcc.policy:tenant' }));
 });
 
 async function client() {

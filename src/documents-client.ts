@@ -1,4 +1,5 @@
 import type { Config } from './config.ts';
+import { hasScope, parseScopes } from './scopes.ts';
 import { DEFAULT_AUTH_URL } from './config.ts';
 import { resolveCredentialsPath, loadCredentials } from './credentials.ts';
 import { createTokenProvider, type TokenProvider } from './auth/session.ts';
@@ -8,8 +9,8 @@ import type { DocumentoDoEditor } from './generate/documento.ts';
 // termos, cookies...). O agente lê e escreve o RASCUNHO; publicar é sempre de uma
 // pessoa na tela (o gcc recusa com publish-human-only). Mesmo Bearer do login.
 
-export const DOCUMENTS_READ_SCOPE = 'gcc:policy:read';
-export const DOCUMENTS_WRITE_SCOPE = 'gcc:policy:write';
+export const DOCUMENTS_READ_SCOPE = 'read:gcc.policy:tenant';
+export const DOCUMENTS_WRITE_SCOPE = 'write:gcc.policy:tenant';
 
 export const DOCUMENT_TYPES = ['privacy', 'terms', 'cookies', 'subprocessadores', 'terceiros', 'custom'] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -76,8 +77,8 @@ export class DocumentsClient {
   private async bearer(scope: string): Promise<string> {
     const token = await this.#tokens.currentToken();
     if (!token) throw new DocumentsError(`Você não está conectado ao HOC Guard (ou o login expirou). ${LOGIN}`, 401);
-    const granted = ((await loadCredentials(this.#credentialsPath))?.scope ?? '').split(/\s+/).filter(Boolean);
-    if (granted.length > 0 && !granted.includes(scope)) throw new DocumentsError(semPermissao(scope), 403, 'missing-scope');
+    const granted = parseScopes((await loadCredentials(this.#credentialsPath))?.scope);
+    if (granted.length > 0 && !hasScope(granted, scope)) throw new DocumentsError(semPermissao(scope), 403, 'missing-scope');
     return token;
   }
 

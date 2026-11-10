@@ -56,7 +56,7 @@ after(async () => {
 beforeEach(async () => {
   chamadas = [];
   rotas = () => undefined;
-  await login('gcc:purposes:read gcc:purposes:write');
+  await login('read:gcc.purposes:tenant write:gcc.purposes:tenant');
 });
 
 async function login(scope: string, expiresAt = Date.now() + 3_600_000) {
@@ -161,7 +161,7 @@ test('sem login: orienta guard_login com os scopes de finalidade e não chama a 
   const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
   assert.ok(isError(r));
   assert.match(texto(r), /guard_login/);
-  assert.match(texto(r), /gcc:purposes:read gcc:purposes:write/);
+  assert.match(texto(r), /read:gcc.purposes:tenant write:gcc.purposes:tenant/);
   assert.equal(chamadas.length, 0);
   await c.close();
 });
@@ -171,16 +171,35 @@ test('guard_login pede por padrão os scopes de finalidade', async () => {
   const { tools } = await c.listTools();
   const login = tools.find((t) => t.name === 'guard_login')!;
   const scope = (login.inputSchema.properties as Record<string, { default?: string }>)['scope']!;
-  assert.equal(scope.default, 'scan generate gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write gcc:audit:read gcc:audit:write');
+  assert.equal(scope.default, 'scan generate read:gcc.purposes:tenant write:gcc.purposes:tenant read:gcc.policy:tenant write:gcc.policy:tenant read:gcc.audit:tenant write:gcc.audit:tenant');
   await c.close();
 });
 
 test('token sem write: escrita explica que o papel não permite, sem chamar a API', async () => {
-  await login('scan generate gcc:purposes:read');
+  await login('scan generate read:gcc.purposes:tenant');
   const c = await client();
   const r = await c.callTool({ name: 'guard_create_purpose', arguments: LI_OK });
   assert.ok(isError(r));
   assert.match(texto(r), /não permite editar finalidades/);
+  assert.equal(chamadas.length, 0);
+  await c.close();
+});
+
+test('credencial antiga com nomes antigos continua valendo para ler e escrever', async () => {
+  await login('scan generate gcc:purposes:read gcc:purposes:write');
+  const c = await client();
+  rotas = () => ({ status: 200, body: { data: [], meta: { total: 0 } } });
+  const r = await c.callTool({ name: 'guard_list_purposes', arguments: {} });
+  assert.ok(!isError(r));
+  assert.equal(chamadas.length, 1);
+  await c.close();
+});
+
+test('credencial antiga só com leitura continua sem escrita', async () => {
+  await login('scan generate gcc:purposes:read');
+  const c = await client();
+  const r = await c.callTool({ name: 'guard_create_purpose', arguments: LI_OK });
+  assert.ok(isError(r));
   assert.equal(chamadas.length, 0);
   await c.close();
 });

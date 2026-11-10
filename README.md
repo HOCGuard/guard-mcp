@@ -193,7 +193,7 @@ link devolvido (`/privacidade/finalidades/<id>`), revisar e clicar em **Liberar*
 
 Regras checadas antes de enviar: legítimo interesse não vale para dado sensível (use consentimento)
 e sempre exige o teste nas três fases (interesse, necessidade, balanceamento) e como a pessoa se opõe.
-O login pede `gcc:purposes:read gcc:purposes:write gcc:policy:read gcc:policy:write` por padrão, mas o token só recebe o que o papel
+O login pede `read:gcc.purposes:tenant write:gcc.purposes:tenant read:gcc.policy:tenant write:gcc.policy:tenant` por padrão, mas o token só recebe o que o papel
 da pessoa na conta permite; sem permissão de edição, as ferramentas de escrita dizem isso.
 
 O roteiro pronto é o prompt **guard-map-purposes** (e a skill `skills/guard-map-purposes`): acha no
